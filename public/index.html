@@ -21,13 +21,8 @@
         <input id="username-input" type="text" maxlength="20" placeholder="Enter your name…" autocomplete="off" />
       </div>
 
-      <div class="lobby-tabs">
-        <button id="tab-create" class="tab-btn active" onclick="switchTab('create')">Create</button>
-        <button id="tab-join"   class="tab-btn"        onclick="switchTab('join')">Join</button>
-      </div>
-
       <!-- Create Room Panel -->
-      <div id="panel-create" class="tab-panel">
+      <div id="panel-create">
         <div class="settings-grid">
           <div class="setting">
             <label for="set-rounds">Rounds</label>
@@ -68,17 +63,19 @@
           <label for="set-customonly">Use custom words only</label>
         </div>
 
-        <button id="btn-create" class="btn btn-primary" onclick="onCreateRoom()">Create &amp; Enter</button>
+        <button id="btn-create" class="btn btn-primary" onclick="onCreateRoom()">Create Room</button>
+        <p class="lobby-switch">Have a room code? <button class="link-btn" onclick="switchTab('join')">Join a room instead →</button></p>
       </div>
 
       <!-- Join Room Panel -->
-      <div id="panel-join" class="tab-panel hidden">
+      <div id="panel-join" class="hidden">
         <div class="input-group">
           <label for="join-code">Room Code</label>
           <input id="join-code" type="text" maxlength="6" placeholder="ABC123" autocomplete="off"
                  style="text-transform:uppercase;letter-spacing:0.15em" />
         </div>
-        <button id="btn-join" class="btn btn-primary" onclick="onJoinRoom()">Join &amp; Enter</button>
+        <button id="btn-join" class="btn btn-primary" onclick="onJoinRoom()">Join Room</button>
+        <p class="lobby-switch"><button class="link-btn" onclick="switchTab('create')">← Create a new room instead</button></p>
       </div>
 
       <div id="lobby-error" class="error-msg hidden"></div>
