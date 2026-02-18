@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const GameManager = require('./src/gameManager');
+const WordBombManager = require('./src/wordBombManager');
 
 const app = express();
 const server = http.createServer(app);
@@ -20,9 +21,18 @@ app.get('/join/:code', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'play.html'));
 });
 
+// Word Bomb page + invite links
+app.get('/wordbomb', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'wordbomb.html'));
+});
+app.get('/wordbomb/join/:code', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'wordbomb.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const gm = new GameManager(io);
+const wbm = new WordBombManager(io);
 
 io.on('connection', (socket) => {
   console.log(`+ connected: ${socket.id}`);
@@ -79,9 +89,17 @@ io.on('connection', (socket) => {
     gm.handlePreGameCategoryVote(socket, data || {});
   });
 
+  // ── Word Bomb ────────────────────────────────────────────────────────────
+  socket.on('wb:create',     (d)  => wbm.createRoom(socket, d || {}));
+  socket.on('wb:join',       (d)  => wbm.joinRoom(socket, d || {}));
+  socket.on('wb:leave',      ()   => wbm.leaveRoom(socket));
+  socket.on('wb:start',      (id) => wbm.startGame(socket, id));
+  socket.on('wb:submitWord', (d)  => wbm.handleSubmitWord(socket, d || {}));
+
   socket.on('disconnect', () => {
     console.log(`- disconnected: ${socket.id}`);
     gm.leaveRoom(socket);
+    wbm.leaveRoom(socket);
   });
 });
 

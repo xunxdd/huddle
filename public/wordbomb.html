@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Word Bomb 💣 — Huddle</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    body { overflow: auto; }
+
+    /* ── Shared ── */
+    .wb-title {
+      font-size: 2rem;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      text-align: center;
+      margin-bottom: 0.25rem;
+    }
+    .wb-tagline { text-align: center; color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.9rem; }
+
+    /* ── Lobby ── */
+    #screen-lobby .lobby-card { max-height: 90vh; overflow-y: auto; }
+
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+    .tab-btn {
+      flex: 1;
+      padding: 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-dim);
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Waiting room ── */
+    #screen-waiting .lobby-card { width: 520px; }
+
+    .room-code-display {
+      text-align: center;
+      margin: 1rem 0;
+    }
+    .room-code-display .code {
+      font-size: 2.5rem;
+      font-weight: 900;
+      letter-spacing: 0.15em;
+      color: var(--accent);
+      font-family: monospace;
+    }
+    .code-label { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    .player-list { margin: 1rem 0; }
+    .player-list-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin-bottom: 0.5rem;
+    }
+    .player-list-items { display: flex; flex-direction: column; gap: 0.4rem; }
+    .player-item {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--surface2);
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+    .player-avatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .player-crown { font-size: 0.9rem; margin-left: auto; }
+
+    /* ── Game screen ── */
+    #screen-game {
+      width: 100vw;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      padding: 0;
+    }
+    #screen-game.hidden { display: none !important; }
+
+    /* Top bar */
+    .wb-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem;
+      flex-shrink: 0;
+    }
+    .wb-round-info { font-size: 0.85rem; color: var(--text-dim); }
+    .wb-round-info strong { color: var(--text); }
+
+    .wb-bomb-combo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+    .wb-bomb-icon { font-size: 1.4rem; }
+
+    /* Timer arc */
+    .wb-timer-wrap { position: relative; width: 52px; height: 52px; }
+    .wb-timer-svg { width: 52px; height: 52px; transform: rotate(-90deg); }
+    .wb-timer-track {
+      fill: none;
+      stroke: var(--border);
+      stroke-width: 4;
+    }
+    .wb-timer-arc {
+      fill: none;
+      stroke: var(--green);
+      stroke-width: 4;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.9s linear, stroke 0.3s;
+    }
+    .wb-timer-num {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      font-weight: 800;
+    }
+
+    /* Main layout */
+    .wb-main {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 0;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Center panel */
+    .wb-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 2rem;
+      gap: 1.5rem;
+    }
+
+    .wb-prompt-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+    }
+
+    .wb-combo-box {
+      background: var(--surface);
+      border: 2px solid var(--accent);
+      border-radius: 16px;
+      padding: 1.5rem 3rem;
+      font-size: 3rem;
+      font-weight: 900;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      text-align: center;
+      box-shadow: 0 0 32px rgba(233,69,96,0.15);
+      font-family: monospace;
+    }
+
+    .wb-active-label {
+      font-size: 0.95rem;
+      color: var(--text-dim);
+      text-align: center;
+    }
+    .wb-active-label strong { color: var(--text); }
+
+    .wb-input-row {
+      display: flex;
+      gap: 0.75rem;
+      width: 100%;
+      max-width: 480px;
+    }
+    .wb-word-input {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 1.1rem;
+      font-weight: 600;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .wb-word-input:focus { border-color: var(--accent); }
+    .wb-word-input:disabled { opacity: 0.4; cursor: not-allowed; }
+    .wb-word-input.shake {
+      animation: shake 0.35s ease;
+    }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%      { transform: translateX(-6px); }
+      40%      { transform: translateX(6px); }
+      60%      { transform: translateX(-4px); }
+      80%      { transform: translateX(4px); }
+    }
+
+    .btn-submit {
+      padding: 0.75rem 1.5rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-submit:hover:not(:disabled) { background: #c73652; }
+    .btn-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .wb-feedback {
+      height: 1.4rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    .wb-feedback.ok { color: var(--green); }
+    .wb-feedback.err { color: var(--accent); }
+
+    /* Right panel — scoreboard + feed */
+    .wb-sidebar {
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .wb-sidebar-section {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .wb-sidebar-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-dim);
+      margin-bottom: 0.6rem;
+    }
+
+    .score-list { display: flex; flex-direction: column; gap: 0.35rem; }
+    .score-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      padding: 0.3rem 0;
+      border-radius: 6px;
+    }
+    .score-rank { width: 18px; font-size: 0.75rem; color: var(--text-dim); text-align: center; }
+    .score-name { flex: 1; font-weight: 600; }
+    .score-pts { font-weight: 700; color: var(--yellow); font-size: 0.8rem; }
+    .score-item.active-player .score-name { color: var(--accent); }
+    .score-item.is-me .score-name::after { content: ' (you)'; color: var(--text-dim); font-weight: 400; }
+
+    /* Feed */
+    .wb-feed {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.75rem 1rem;
+    }
+    .wb-feed-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-dim);
+      margin-bottom: 0.5rem;
+    }
+    .feed-items { display: flex; flex-direction: column; gap: 0.35rem; }
+    .feed-item {
+      font-size: 0.8rem;
+      padding: 0.35rem 0.5rem;
+      border-radius: 6px;
+      background: var(--surface2);
+      line-height: 1.4;
+    }
+    .feed-item .feed-name { font-weight: 700; }
+    .feed-item .feed-word { color: var(--green); font-weight: 600; }
+    .feed-item .feed-pts { color: var(--yellow); font-size: 0.75rem; }
+    .feed-item .feed-timeout { color: var(--accent); }
+
+    /* Overlays */
+    .wb-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,15,26,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .wb-overlay.hidden { display: none !important; }
+
+    .wb-overlay-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2rem 2.5rem;
+      min-width: 320px;
+      max-width: 480px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .wb-overlay-title {
+      font-size: 1.5rem;
+      font-weight: 900;
+      margin-bottom: 1rem;
+    }
+    .wb-overlay-scores { margin: 1rem 0; text-align: left; }
+    .overlay-score-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+    .overlay-score-row:last-child { border-bottom: none; }
+    .overlay-rank { width: 22px; text-align: center; color: var(--text-dim); font-size: 0.8rem; }
+    .overlay-name { flex: 1; font-weight: 600; }
+    .overlay-pts { font-weight: 700; color: var(--yellow); }
+
+    /* General button styles */
+    .btn {
+      display: inline-block;
+      padding: 0.6rem 1.5rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #c73652; }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-full { width: 100%; margin-top: 0.5rem; padding: 0.7rem; }
+
+    /* Misc */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+      transition: color 0.15s;
+    }
+    .back-link:hover { color: var(--text); }
+
+    .copy-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .wb-main { grid-template-columns: 1fr; }
+      .wb-sidebar { border-left: none; border-top: 1px solid var(--border); max-height: 240px; }
+      .settings-grid { grid-template-columns: 1fr; }
+      .wb-combo-box { font-size: 2rem; padding: 1rem 2rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Lobby ──────────────────────────────────────────────── -->
+  <div id="screen-lobby" class="screen">
+    <div class="lobby-card">
+      <a href="/" class="back-link">← Back to Huddle</a>
+      <div class="wb-title">💣 Word Bomb</div>
+      <p class="wb-tagline">Find a word with the combo before the clock runs out!</p>
+
+      <!-- Direct-join panel (shown when arriving via invite link) -->
+      <div id="lobby-direct-join" class="hidden">
+        <p style="color:var(--text-dim);font-size:0.9rem;margin-bottom:1rem;text-align:center">You've been invited! Enter your name to jump in.</p>
+        <div class="input-group">
+          <label class="input-label">Your name</label>
+          <input id="inp-username-direct" class="input-field" type="text" placeholder="Enter your name" maxlength="20" autocomplete="off" />
+        </div>
+        <button id="btn-direct-join" class="btn btn-primary btn-full">Join Game →</button>
+        <p style="text-align:center;margin-top:0.75rem">
+          <button id="btn-back-to-lobby" style="background:none;border:none;color:var(--text-dim);font-size:0.85rem;cursor:pointer">← Back to lobby</button>
+        </p>
+      </div>
+
+      <div id="lobby-username-step">
+        <div class="input-group">
+          <label class="input-label">Your name</label>
+          <input id="inp-username" class="input-field" type="text" placeholder="Enter your name" maxlength="20" autocomplete="off" />
+        </div>
+        <button id="btn-continue" class="btn btn-primary btn-full">Continue →</button>
+      </div>
+
+      <div id="lobby-choice-step" class="hidden">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="create">Create Room</button>
+          <button class="tab-btn" data-tab="join">Join Room</button>
+        </div>
+
+        <!-- Create tab -->
+        <div id="tab-create" class="tab-panel active">
+          <div class="settings-grid">
+            <div class="input-group">
+              <label class="input-label">Rounds</label>
+              <select id="inp-rounds" class="input-field">
+                <option value="3">3 rounds</option>
+                <option value="5" selected>5 rounds</option>
+                <option value="7">7 rounds</option>
+                <option value="10">10 rounds</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label class="input-label">Time per turn</label>
+              <select id="inp-time" class="input-field">
+                <option value="8">8 seconds</option>
+                <option value="12" selected>12 seconds</option>
+                <option value="15">15 seconds</option>
+                <option value="20">20 seconds</option>
+              </select>
+            </div>
+          </div>
+          <button id="btn-create" class="btn btn-primary btn-full">Create Room</button>
+        </div>
+
+        <!-- Join tab -->
+        <div id="tab-join" class="tab-panel">
+          <div class="input-group">
+            <label class="input-label">Room code</label>
+            <input id="inp-room-code" class="input-field" type="text" placeholder="e.g. ABCD12" maxlength="6"
+              autocomplete="off" style="text-transform:uppercase;letter-spacing:0.1em" />
+          </div>
+          <button id="btn-join" class="btn btn-primary btn-full">Join Room</button>
+        </div>
+      </div>
+
+      <p id="lobby-error" class="hidden" style="color:var(--accent);font-size:0.85rem;margin-top:0.75rem;text-align:center"></p>
+    </div>
+  </div>
+
+  <!-- ── Waiting Room ───────────────────────────────────────── -->
+  <div id="screen-waiting" class="screen hidden">
+    <div class="lobby-card" style="width:520px">
+      <a href="/" class="back-link">← Leave room</a>
+      <div class="wb-title">💣 Word Bomb</div>
+      <div class="room-code-display">
+        <div class="code-label">Room Code</div>
+        <div class="code" id="waiting-room-code">------</div>
+        <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:0.4rem">
+          <button class="copy-btn" id="btn-copy-code">Copy Code</button>
+          <button class="copy-btn" id="btn-copy-link">🔗 Invite Link</button>
+        </div>
+        <p id="link-copied-msg" class="hidden" style="font-size:0.75rem;color:var(--green);margin-top:0.3rem">Link copied!</p>
+      </div>
+
+      <div class="player-list">
+        <div class="player-list-title">Players (<span id="waiting-player-count">0</span>/<span id="waiting-max-players">8</span>)</div>
+        <div class="player-list-items" id="waiting-players"></div>
+      </div>
+
+      <p id="waiting-hint" style="font-size:0.8rem;color:var(--text-dim);text-align:center;margin-bottom:0.75rem">
+        Share the room code with friends!
+      </p>
+
+      <button id="btn-start" class="btn btn-primary btn-full hidden">Start Game</button>
+      <p id="waiting-not-owner" class="hidden" style="text-align:center;color:var(--text-dim);font-size:0.85rem">
+        Waiting for the host to start…
+      </p>
+    </div>
+  </div>
+
+  <!-- ── Game Screen ────────────────────────────────────────── -->
+  <div id="screen-game" class="hidden" style="display:none">
+
+    <!-- Top bar -->
+    <div class="wb-topbar">
+      <div class="wb-round-info">
+        Round <strong id="hud-round">1</strong> / <span id="hud-total-rounds">5</span>
+      </div>
+      <div class="wb-bomb-combo">
+        <span class="wb-bomb-icon">💣</span>
+        <span id="hud-combo" style="font-size:1.3rem;font-family:monospace;color:var(--accent)">--</span>
+      </div>
+      <div class="wb-timer-wrap">
+        <svg class="wb-timer-svg" viewBox="0 0 52 52">
+          <circle class="wb-timer-track" cx="26" cy="26" r="22"/>
+          <circle class="wb-timer-arc" id="timer-arc" cx="26" cy="26" r="22"
+            stroke-dasharray="138.2" stroke-dashoffset="0"/>
+        </svg>
+        <div class="wb-timer-num" id="hud-timer">12</div>
+      </div>
+    </div>
+
+    <!-- Main layout -->
+    <div class="wb-main">
+
+      <!-- Center -->
+      <div class="wb-center">
+        <div class="wb-prompt-label">Find a word containing</div>
+        <div class="wb-combo-box" id="center-combo">--</div>
+        <div class="wb-active-label" id="active-label">Waiting…</div>
+
+        <div class="wb-input-row">
+          <input id="wb-word-input" class="wb-word-input" type="text"
+            placeholder="Type your word…" maxlength="30" autocomplete="off"
+            disabled />
+          <button id="wb-submit-btn" class="btn-submit" disabled>Send</button>
+        </div>
+        <div class="wb-feedback" id="wb-feedback"></div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="wb-sidebar">
+        <div class="wb-sidebar-section">
+          <div class="wb-sidebar-title">Scoreboard</div>
+          <div class="score-list" id="score-list"></div>
+        </div>
+        <div class="wb-feed">
+          <div class="wb-feed-title">Recent turns</div>
+          <div class="feed-items" id="feed-items"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Round End Overlay ──────────────────────────────────── -->
+  <div id="overlay-round-end" class="wb-overlay hidden">
+    <div class="wb-overlay-card">
+      <div class="wb-overlay-title" id="round-end-title">Round 1 Complete!</div>
+      <div class="wb-overlay-scores" id="round-end-scores"></div>
+      <p style="color:var(--text-dim);font-size:0.85rem" id="round-end-next">Next round starting…</p>
+    </div>
+  </div>
+
+  <!-- ── Game End Overlay ───────────────────────────────────── -->
+  <div id="overlay-game-end" class="wb-overlay hidden">
+    <div class="wb-overlay-card">
+      <div style="font-size:2.5rem;margin-bottom:0.5rem">🏆</div>
+      <div class="wb-overlay-title" id="game-end-winner">Game Over!</div>
+      <div class="wb-overlay-scores" id="game-end-scores"></div>
+      <div style="margin-top:1rem;display:flex;gap:0.75rem;justify-content:center">
+        <button id="btn-play-again" class="btn btn-primary">Play Again</button>
+        <a href="/" class="btn btn-secondary">Home</a>
+      </div>
+      <p style="color:var(--text-dim);font-size:0.8rem;margin-top:0.75rem" id="game-end-countdown"></p>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/wordbomb.js"></script>
+</body>
+</html>
