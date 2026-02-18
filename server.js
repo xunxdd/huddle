@@ -58,6 +58,14 @@ io.on('connection', (socket) => {
     gm.handleClear(socket);
   });
 
+  socket.on('draw:restore', (data) => {
+    gm.handleRestore(socket, data);
+  });
+
+  socket.on('draw:shape', (data) => {
+    gm.handleShape(socket, data);
+  });
+
   socket.on('room:categoryVote', (data) => {
     gm.handlePreGameCategoryVote(socket, data || {});
   });

@@ -640,6 +640,18 @@ class GameManager {
     socket.to(room.id).emit('draw:cleared', {});
   }
 
+  handleRestore(socket, data) {
+    const room = this._getPlayerRoom(socket);
+    if (!room || room.currentDrawer !== socket.id || room.state !== 'drawing') return;
+    socket.to(room.id).emit('draw:restore', data);
+  }
+
+  handleShape(socket, data) {
+    const room = this._getPlayerRoom(socket);
+    if (!room || room.currentDrawer !== socket.id || room.state !== 'drawing') return;
+    socket.to(room.id).emit('draw:shape', data);
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   _getPlayerRoom(socket) {

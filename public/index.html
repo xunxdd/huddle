@@ -171,9 +171,24 @@
         <div id="toolbar" class="toolbar hidden">
           <!-- Tools -->
           <div class="tool-group" id="tool-buttons">
-            <button class="tool-btn active" data-tool="pencil" title="Pencil" onclick="selectTool('pencil')">✏️</button>
-            <button class="tool-btn" data-tool="eraser" title="Eraser" onclick="selectTool('eraser')">◻</button>
-            <button class="tool-btn" data-tool="fill"   title="Fill Bucket" onclick="selectTool('fill')">🪣</button>
+            <button class="tool-btn active" data-tool="pencil" title="Pencil"      onclick="selectTool('pencil')">✏️</button>
+            <button class="tool-btn"        data-tool="eraser" title="Eraser"      onclick="selectTool('eraser')">◻</button>
+            <button class="tool-btn"        data-tool="fill"   title="Fill Bucket" onclick="selectTool('fill')">🪣</button>
+            <!-- Shapes dropdown trigger -->
+            <button class="tool-btn" id="btn-shapes" title="Shapes" onclick="toggleShapesPicker(event)">▭</button>
+          </div>
+          <!-- Shapes popup (portaled to body via JS positioning) -->
+          <div id="shapes-dropdown" class="shapes-dropdown hidden">
+            <div class="shapes-grid">
+              <button class="shape-opt" data-shape="line"     title="Line"             onclick="selectShape('line')">╱</button>
+              <button class="shape-opt" data-shape="arrow"    title="Arrow"            onclick="selectShape('arrow')">↗</button>
+              <button class="shape-opt" data-shape="rect"     title="Rectangle"        onclick="selectShape('rect')">▭</button>
+              <button class="shape-opt" data-shape="rect-r"   title="Rounded Rect"     onclick="selectShape('rect-r')">▢</button>
+              <button class="shape-opt" data-shape="ellipse"  title="Circle / Ellipse" onclick="selectShape('ellipse')">○</button>
+              <button class="shape-opt" data-shape="triangle" title="Triangle"         onclick="selectShape('triangle')">△</button>
+              <button class="shape-opt" data-shape="star"     title="Star"             onclick="selectShape('star')">★</button>
+              <button class="shape-opt" data-shape="hexagon"  title="Hexagon"          onclick="selectShape('hexagon')">⬡</button>
+            </div>
           </div>
 
           <div class="tool-divider"></div>
@@ -194,7 +209,8 @@
 
           <div class="tool-divider"></div>
 
-          <!-- Clear -->
+          <!-- Undo + Clear -->
+          <button class="tool-btn" id="btn-undo" title="Undo (Ctrl+Z)" onclick="onUndoCanvas()">↩</button>
           <button class="tool-btn" id="btn-clear" title="Clear canvas" onclick="onClearCanvas()">🗑️</button>
         </div>
       </main>

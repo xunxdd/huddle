@@ -46,11 +46,15 @@ const State = {
     size: 4,
     lastX: 0,
     lastY: 0,
+    startX: 0,
+    startY: 0,
+    shapeSnapshot: null,
   },
 
   canvas: null,
   ctx: null,
   wordChoiceTimer: null,
+  drawHistory: [],    // ImageData snapshots for undo
 
   // Pre-game category voting
   categoryVotes: {},      // { categoryName: count }
@@ -69,6 +73,21 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('join-code').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') onJoinRoom();
+  });
+
+  // Ctrl+Z / Cmd+Z for undo while drawing
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && State.isDrawer) {
+      e.preventDefault();
+      onUndoCanvas();
+    }
+  });
+
+  // Close shapes picker when clicking outside it
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#shapes-dropdown') && !e.target.closest('#btn-shapes')) {
+      closeShapesPicker();
+    }
   });
 });
 
@@ -196,6 +215,9 @@ function initSocket() {
     setToolbarVisible(true);
     setChatEnabled(false);
     setCanvasOverlay('');
+    // Save blank canvas as first undo state
+    State.drawHistory = [];
+    saveDrawSnapshot();
   });
 
   s.on('game:hint', ({ wordDisplay, hintNumber }) => {
@@ -302,6 +324,24 @@ function initSocket() {
 
   s.on('draw:cleared', () => {
     clearCanvas();
+    State.drawHistory = [];
+    if (State.isDrawer) saveDrawSnapshot();
+  });
+
+  s.on('draw:shape', ({ shape, nx1, ny1, nx2, ny2, color, size }) => {
+    if (!State.ctx || !State.canvas) return;
+    const x1 = nx1 * State.canvas.width, y1 = ny1 * State.canvas.height;
+    const x2 = nx2 * State.canvas.width, y2 = ny2 * State.canvas.height;
+    drawShape(State.ctx, shape, x1, y1, x2, y2, color, size);
+  });
+
+  s.on('draw:restore', ({ dataUrl }) => {
+    const img = new Image();
+    img.onload = () => {
+      State.ctx.clearRect(0, 0, State.canvas.width, State.canvas.height);
+      State.ctx.drawImage(img, 0, 0);
+    };
+    img.src = dataUrl;
   });
 
   // ── Chat ──
@@ -378,14 +418,22 @@ function onPointerDown(e) {
     floodFill(State.ctx, x, y, drawing.color);
     const { nx, ny } = norm(x, y);
     State.socket.emit('draw:fill', { nx, ny, color: drawing.color });
+    saveDrawSnapshot();
     return;
   }
 
   drawing.active = true;
+  drawing.startX = x;
+  drawing.startY = y;
   drawing.lastX = x;
   drawing.lastY = y;
 
-  // Start path
+  if (isShapeTool(drawing.tool)) {
+    drawing.shapeSnapshot = State.ctx.getImageData(0, 0, State.canvas.width, State.canvas.height);
+    return;
+  }
+
+  // Freehand (pencil/eraser)
   applyStrokeStyle(State.ctx, drawing);
   State.ctx.beginPath();
   State.ctx.moveTo(x, y);
@@ -405,6 +453,18 @@ function onPointerMove(e) {
   const { x, y } = getPos(e);
   const { drawing } = State;
 
+  if (isShapeTool(drawing.tool)) {
+    // Live preview: restore pre-shape snapshot then draw current shape
+    if (drawing.shapeSnapshot) {
+      State.ctx.putImageData(drawing.shapeSnapshot, 0, 0);
+    }
+    drawShape(State.ctx, drawing.tool, drawing.startX, drawing.startY, x, y, drawing.color, drawing.size);
+    drawing.lastX = x;
+    drawing.lastY = y;
+    return;
+  }
+
+  // Freehand
   applyStrokeStyle(State.ctx, drawing);
   State.ctx.lineTo(x, y);
   State.ctx.stroke();
@@ -429,14 +489,35 @@ function onPointerMove(e) {
 
 function onPointerUp(e) {
   if (!State.drawing.active) return;
-  State.drawing.active = false;
-  State.ctx.beginPath(); // reset path
-  const { nx, ny } = norm(State.drawing.lastX, State.drawing.lastY);
+  const { drawing } = State;
+  drawing.active = false;
+
+  if (isShapeTool(drawing.tool)) {
+    // Finalize shape: restore snapshot, draw final shape
+    if (drawing.shapeSnapshot) {
+      State.ctx.putImageData(drawing.shapeSnapshot, 0, 0);
+      drawing.shapeSnapshot = null;
+    }
+    drawShape(State.ctx, drawing.tool, drawing.startX, drawing.startY, drawing.lastX, drawing.lastY, drawing.color, drawing.size);
+    const { nx: nx1, ny: ny1 } = norm(drawing.startX, drawing.startY);
+    const { nx: nx2, ny: ny2 } = norm(drawing.lastX, drawing.lastY);
+    State.socket.emit('draw:shape', {
+      shape: drawing.tool, nx1, ny1, nx2, ny2,
+      color: drawing.color, size: drawing.size,
+    });
+    saveDrawSnapshot();
+    return;
+  }
+
+  // Freehand end
+  State.ctx.beginPath();
+  const { nx, ny } = norm(drawing.lastX, drawing.lastY);
   State.socket.emit('draw:stroke', {
     type: 'end', nx, ny,
-    color: State.drawing.tool === 'eraser' ? '#ffffff' : State.drawing.color,
-    size: State.drawing.size, tool: State.drawing.tool,
+    color: drawing.tool === 'eraser' ? '#ffffff' : drawing.color,
+    size: drawing.size, tool: drawing.tool,
   });
+  saveDrawSnapshot();
 }
 
 function applyStrokeStyle(ctx, drawing) {
@@ -475,6 +556,98 @@ function replayStroke({ type, nx, ny, color, size, tool }) {
     ctx.beginPath();
     remotePathActive = false;
   }
+}
+
+// ── Shape Tools ──
+const SHAPE_TOOLS = new Set(['line', 'arrow', 'rect', 'rect-r', 'ellipse', 'triangle', 'star', 'hexagon']);
+const SHAPE_ICONS = { line:'╱', arrow:'↗', rect:'▭', 'rect-r':'▢', ellipse:'○', triangle:'△', star:'★', hexagon:'⬡' };
+function isShapeTool(tool) { return SHAPE_TOOLS.has(tool); }
+
+function drawShape(ctx, shape, x1, y1, x2, y2, color, size) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = size;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  switch (shape) {
+    case 'line':
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      break;
+    case 'arrow': {
+      const dx = x2 - x1, dy = y2 - y1;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 2) break;
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      const angle = Math.atan2(dy, dx);
+      const headLen = Math.min(22, len * 0.35);
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+      ctx.stroke();
+      break;
+    }
+    case 'rect':
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      break;
+    case 'rect-r': {
+      const w = x2 - x1, h = y2 - y1;
+      const r = Math.min(Math.abs(w), Math.abs(h)) * 0.18;
+      ctx.roundRect ? ctx.roundRect(x1, y1, w, h, r) : (() => {
+        const sx = x1, sy = y1;
+        ctx.moveTo(sx + r, sy);
+        ctx.lineTo(sx + w - r, sy); ctx.arcTo(sx + w, sy, sx + w, sy + r, r);
+        ctx.lineTo(sx + w, sy + h - r); ctx.arcTo(sx + w, sy + h, sx + w - r, sy + h, r);
+        ctx.lineTo(sx + r, sy + h); ctx.arcTo(sx, sy + h, sx, sy + h - r, r);
+        ctx.lineTo(sx, sy + r); ctx.arcTo(sx, sy, sx + r, sy, r);
+        ctx.closePath();
+      })();
+      ctx.stroke();
+      break;
+    }
+    case 'ellipse': {
+      const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+      const rx = Math.abs(x2 - x1) / 2, ry = Math.abs(y2 - y1) / 2;
+      if (rx > 0 && ry > 0) { ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.stroke(); }
+      break;
+    }
+    case 'triangle': {
+      const mx = (x1 + x2) / 2;
+      ctx.moveTo(mx, y1); ctx.lineTo(x2, y2); ctx.lineTo(x1, y2); ctx.closePath(); ctx.stroke();
+      break;
+    }
+    case 'star': {
+      const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+      const outerR = Math.min(Math.abs(x2 - x1), Math.abs(y2 - y1)) / 2;
+      const innerR = outerR * 0.4;
+      for (let i = 0; i < 10; i++) {
+        const r = i % 2 === 0 ? outerR : innerR;
+        const angle = (i * Math.PI / 5) - Math.PI / 2;
+        i === 0 ? ctx.moveTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle))
+                : ctx.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+      }
+      ctx.closePath(); ctx.stroke();
+      break;
+    }
+    case 'hexagon': {
+      const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+      const r = Math.min(Math.abs(x2 - x1), Math.abs(y2 - y1)) / 2;
+      for (let i = 0; i <= 6; i++) {
+        const angle = (i * Math.PI * 2) / 6 - Math.PI / 2;
+        i === 0 ? ctx.moveTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle))
+                : ctx.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+      }
+      ctx.closePath(); ctx.stroke();
+      break;
+    }
+  }
+  ctx.restore();
 }
 
 // ── Flood Fill ──
@@ -832,7 +1005,46 @@ function selectTool(tool) {
   document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tool === tool);
   });
+  // Shapes button is active when any shape tool is selected
+  const shapesBtn = document.getElementById('btn-shapes');
+  if (shapesBtn) {
+    const isShape = isShapeTool(tool);
+    shapesBtn.classList.toggle('active', isShape);
+    if (isShape) shapesBtn.textContent = SHAPE_ICONS[tool] || '▭';
+  }
+  document.querySelectorAll('.shape-opt').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.shape === tool);
+  });
   State.canvas.style.cursor = 'crosshair';
+}
+
+function toggleShapesPicker(e) {
+  e.stopPropagation();
+  const dropdown = document.getElementById('shapes-dropdown');
+  if (!dropdown.classList.contains('hidden')) {
+    dropdown.classList.add('hidden');
+    return;
+  }
+  // Position fixed, above the button
+  const btn = document.getElementById('btn-shapes');
+  const rect = btn.getBoundingClientRect();
+  dropdown.style.left = `${rect.left + rect.width / 2}px`;
+  dropdown.style.bottom = `${window.innerHeight - rect.top + 10}px`;
+  dropdown.style.transform = 'translateX(-50%)';
+  dropdown.classList.remove('hidden');
+  // Sync active state
+  document.querySelectorAll('.shape-opt').forEach(b => {
+    b.classList.toggle('active', b.dataset.shape === State.drawing.tool);
+  });
+}
+
+function closeShapesPicker() {
+  document.getElementById('shapes-dropdown')?.classList.add('hidden');
+}
+
+function selectShape(shapeName) {
+  selectTool(shapeName);
+  closeShapesPicker();
 }
 
 function selectColor(hex) {
@@ -848,6 +1060,30 @@ function selectSize(size) {
   document.querySelectorAll('.size-btn').forEach(btn => {
     btn.classList.toggle('active', parseInt(btn.dataset.size) === size);
   });
+}
+
+function saveDrawSnapshot() {
+  if (!State.ctx || !State.canvas) return;
+  const imageData = State.ctx.getImageData(0, 0, State.canvas.width, State.canvas.height);
+  State.drawHistory.push(imageData);
+  if (State.drawHistory.length > 30) State.drawHistory.shift();
+}
+
+function onUndoCanvas() {
+  if (!State.isDrawer) return;
+  if (State.drawHistory.length <= 1) {
+    // Nothing to undo beyond blank — just clear
+    clearCanvas();
+    State.drawHistory = [];
+    saveDrawSnapshot();
+  } else {
+    State.drawHistory.pop(); // discard current
+    const prev = State.drawHistory[State.drawHistory.length - 1];
+    State.ctx.putImageData(prev, 0, 0);
+  }
+  // Sync to other players
+  const dataUrl = State.canvas.toDataURL('image/png');
+  State.socket.emit('draw:restore', { dataUrl });
 }
 
 function onClearCanvas() {
