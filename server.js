@@ -10,12 +10,12 @@ const io = new Server(server, {
   cors: { origin: '*' },
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
-
 // Serve index.html for invite links so client-side JS can read the room code
 app.get('/join/:code', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+app.use(express.static(path.join(__dirname, 'public')));
 
 const gm = new GameManager(io);
 
