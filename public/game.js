@@ -638,9 +638,18 @@ function renderWaitingRoom() {
   const room = State.room;
   if (!room) return;
 
-  document.getElementById('waiting-room-code').textContent = room.id;
-  document.getElementById('waiting-info').textContent =
-    `${room.players.length} / ${room.maxPlayers} players · ${room.totalRounds} rounds · ${room.drawTime}s draw time`;
+  State.isOwner = room.owner === State.playerId;
+
+  // Owner-only elements
+  document.getElementById('room-code-section').classList.toggle('hidden', !State.isOwner);
+  document.getElementById('waiting-info').classList.toggle('hidden', !State.isOwner);
+  document.getElementById('cat-picker-section').classList.toggle('hidden', !State.isOwner);
+
+  if (State.isOwner) {
+    document.getElementById('waiting-room-code').textContent = room.id;
+    document.getElementById('waiting-info').textContent =
+      `${room.players.length} / ${room.maxPlayers} players · ${room.totalRounds} rounds · ${room.drawTime}s draw time`;
+  }
 
   const list = document.getElementById('waiting-player-list');
   list.innerHTML = '';
@@ -652,7 +661,6 @@ function renderWaitingRoom() {
     list.appendChild(li);
   });
 
-  State.isOwner = room.owner === State.playerId;
   const startBtn = document.getElementById('btn-start');
   const statusEl = document.getElementById('waiting-status');
 
@@ -664,7 +672,7 @@ function renderWaitingRoom() {
     statusEl.classList.remove('hidden');
   }
 
-  renderCategoryPicker();
+  if (State.isOwner) renderCategoryPicker();
 }
 
 function renderCategoryPicker() {

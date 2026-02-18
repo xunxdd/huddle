@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Scribble-O</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
 
@@ -99,7 +99,7 @@
         <button class="btn btn-sm btn-ghost" onclick="onLeaveRoom()">Leave</button>
       </div>
 
-      <div class="room-code-display">
+      <div id="room-code-section" class="room-code-display">
         <span class="room-code-label">Room Code</span>
         <span id="waiting-room-code" class="room-code-value">——</span>
         <button class="btn btn-xs btn-ghost" onclick="copyRoomCode()" title="Copy code">⧉ Copy</button>
@@ -111,8 +111,8 @@
 
       <ul id="waiting-player-list" class="waiting-player-list"></ul>
 
-      <!-- Category Picker -->
-      <div class="cat-picker">
+      <!-- Category Picker (owner only) -->
+      <div id="cat-picker-section" class="cat-picker">
         <div class="cat-picker-header">
           <span class="cat-picker-label">Category</span>
           <span id="cat-winner-badge" class="cat-winner-badge">Mixed (default)</span>
@@ -255,6 +255,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="game.js"></script>
+  <script src="/game.js"></script>
 </body>
 </html>
