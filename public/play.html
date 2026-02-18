@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scribble-O</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════════════════════
+       LOBBY SCREEN
+  ══════════════════════════════════════════════════════════ -->
+  <div id="lobby-screen" class="screen">
+    <div class="lobby-card">
+      <h1 class="logo">Scribble<span class="logo-o">-O</span></h1>
+      <p class="tagline">Draw. Guess. Win.</p>
+
+      <div class="input-group">
+        <label for="username-input">Your Name</label>
+        <input id="username-input" type="text" maxlength="20" placeholder="Enter your name…" autocomplete="off" />
+      </div>
+
+      <!-- Direct Join Panel (shown when arriving via invite link) -->
+      <div id="panel-direct-join" class="hidden">
+        <p class="direct-join-msg">You've been invited to play! Enter your name to jump in.</p>
+        <button class="btn btn-primary" onclick="onDirectJoin()">Join Game</button>
+        <p class="lobby-switch"><button class="link-btn" onclick="showLobbyDefault()">← Back to lobby</button></p>
+      </div>
+
+      <!-- Create Room Panel -->
+      <div id="panel-create">
+        <div class="settings-grid">
+          <div class="setting">
+            <label for="set-rounds">Rounds</label>
+            <select id="set-rounds">
+              <option value="2">2</option>
+              <option value="3" selected>3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+          </div>
+          <div class="setting">
+            <label for="set-drawtime">Draw Time</label>
+            <select id="set-drawtime">
+              <option value="60">60 s</option>
+              <option value="80" selected>80 s</option>
+              <option value="100">100 s</option>
+              <option value="120">120 s</option>
+            </select>
+          </div>
+          <div class="setting">
+            <label for="set-maxplayers">Max Players</label>
+            <select id="set-maxplayers">
+              <option value="4">4</option>
+              <option value="6">6</option>
+              <option value="8" selected>8</option>
+              <option value="12">12</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="setting custom-words-section">
+          <label for="set-customwords">Custom Words <span class="hint">(one per line, max 100)</span></label>
+          <textarea id="set-customwords" rows="4" placeholder="apple&#10;rocket ship&#10;electric guitar"></textarea>
+        </div>
+
+        <div class="setting checkbox-row">
+          <input type="checkbox" id="set-customonly" />
+          <label for="set-customonly">Use custom words only</label>
+        </div>
+
+        <button id="btn-create" class="btn btn-primary" onclick="onCreateRoom()">Create Room</button>
+        <p class="lobby-switch">Have a room code? <button class="link-btn" onclick="switchTab('join')">Join a room instead →</button></p>
+      </div>
+
+      <!-- Join Room Panel -->
+      <div id="panel-join" class="hidden">
+        <div class="input-group">
+          <label for="join-code">Room Code</label>
+          <input id="join-code" type="text" maxlength="6" placeholder="ABC123" autocomplete="off"
+                 style="text-transform:uppercase;letter-spacing:0.15em" />
+        </div>
+        <button id="btn-join" class="btn btn-primary" onclick="onJoinRoom()">Join Room</button>
+        <p class="lobby-switch"><button class="link-btn" onclick="switchTab('create')">← Create a new room instead</button></p>
+      </div>
+
+      <div id="lobby-error" class="error-msg hidden"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       WAITING ROOM SCREEN
+  ══════════════════════════════════════════════════════════ -->
+  <div id="waiting-screen" class="screen hidden">
+    <div class="waiting-card">
+      <div class="waiting-header">
+        <h2>Waiting Room</h2>
+        <button class="btn btn-sm btn-ghost" onclick="onLeaveRoom()">Leave</button>
+      </div>
+
+      <div id="room-code-section" class="room-code-display">
+        <span class="room-code-label">Room Code</span>
+        <span id="waiting-room-code" class="room-code-value">——</span>
+        <button class="btn btn-xs btn-ghost" onclick="copyRoomCode()" title="Copy code">⧉ Copy</button>
+        <button class="btn btn-xs btn-primary" onclick="copyInviteLink()" title="Copy invite link">🔗 Invite Link</button>
+      </div>
+      <div id="invite-copied-msg" class="invite-copied hidden">Link copied!</div>
+
+      <div class="waiting-info" id="waiting-info">Waiting for players…</div>
+
+      <ul id="waiting-player-list" class="waiting-player-list"></ul>
+
+      <!-- Category Picker (owner only) -->
+      <div id="cat-picker-section" class="cat-picker">
+        <div class="cat-picker-header">
+          <span class="cat-picker-label">Category</span>
+          <span id="cat-winner-badge" class="cat-winner-badge">Mixed (default)</span>
+        </div>
+        <div id="cat-picker-grid" class="cat-picker-grid"></div>
+      </div>
+
+      <div id="waiting-controls">
+        <button id="btn-start" class="btn btn-primary hidden" onclick="onStartGame()">
+          Start Game
+        </button>
+        <p id="waiting-status" class="waiting-status">Waiting for the host to start…</p>
+      </div>
+
+      <div id="waiting-error" class="error-msg hidden"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       GAME SCREEN
+  ══════════════════════════════════════════════════════════ -->
+  <div id="game-screen" class="screen hidden">
+
+    <!-- Top bar -->
+    <div id="game-topbar">
+      <div id="topbar-round">Round <span id="top-round">1</span>/<span id="top-totalrounds">3</span></div>
+      <div id="topbar-word">
+        <span id="word-display" class="word-display">— — —</span>
+      </div>
+      <div id="topbar-timer">
+        <svg class="timer-ring" viewBox="0 0 36 36">
+          <circle class="timer-bg" cx="18" cy="18" r="15.9" />
+          <circle id="timer-arc" class="timer-arc" cx="18" cy="18" r="15.9" />
+        </svg>
+        <span id="timer-number" class="timer-number">80</span>
+      </div>
+    </div>
+
+    <!-- Main 3-column layout -->
+    <div id="game-layout">
+
+      <!-- Left: Player List -->
+      <aside id="player-panel">
+        <h3 class="panel-title">Players</h3>
+        <ul id="player-list"></ul>
+      </aside>
+
+      <!-- Center: Canvas + Tools -->
+      <main id="canvas-panel">
+        <div id="canvas-wrapper">
+          <canvas id="game-canvas" width="800" height="560"></canvas>
+          <div id="canvas-overlay-msg" class="canvas-overlay-msg hidden"></div>
+        </div>
+
+        <!-- Drawing Toolbar (only visible when drawing) -->
+        <div id="toolbar" class="toolbar hidden">
+          <!-- Tools -->
+          <div class="tool-group" id="tool-buttons">
+            <button class="tool-btn active" data-tool="pencil" title="Pencil"      onclick="selectTool('pencil')">✏️</button>
+            <button class="tool-btn"        data-tool="eraser" title="Eraser"      onclick="selectTool('eraser')">◻</button>
+            <button class="tool-btn"        data-tool="fill"   title="Fill Bucket" onclick="selectTool('fill')">🪣</button>
+            <!-- Shapes dropdown trigger -->
+            <button class="tool-btn" id="btn-shapes" title="Shapes" onclick="toggleShapesPicker(event)">▭</button>
+          </div>
+          <!-- Shapes popup (portaled to body via JS positioning) -->
+          <div id="shapes-dropdown" class="shapes-dropdown hidden">
+            <div class="shapes-grid">
+              <button class="shape-opt" data-shape="line"     title="Line"             onclick="selectShape('line')">╱</button>
+              <button class="shape-opt" data-shape="arrow"    title="Arrow"            onclick="selectShape('arrow')">↗</button>
+              <button class="shape-opt" data-shape="rect"     title="Rectangle"        onclick="selectShape('rect')">▭</button>
+              <button class="shape-opt" data-shape="rect-r"   title="Rounded Rect"     onclick="selectShape('rect-r')">▢</button>
+              <button class="shape-opt" data-shape="ellipse"  title="Circle / Ellipse" onclick="selectShape('ellipse')">○</button>
+              <button class="shape-opt" data-shape="triangle" title="Triangle"         onclick="selectShape('triangle')">△</button>
+              <button class="shape-opt" data-shape="star"     title="Star"             onclick="selectShape('star')">★</button>
+              <button class="shape-opt" data-shape="hexagon"  title="Hexagon"          onclick="selectShape('hexagon')">⬡</button>
+            </div>
+          </div>
+
+          <div class="tool-divider"></div>
+
+          <!-- Color swatches -->
+          <div class="color-palette" id="color-palette"></div>
+          <input type="color" id="color-picker" value="#000000" title="Custom color" />
+
+          <div class="tool-divider"></div>
+
+          <!-- Brush sizes -->
+          <div class="size-group" id="size-buttons">
+            <button class="size-btn active" data-size="4"  onclick="selectSize(4)"><span style="width:4px;height:4px"></span></button>
+            <button class="size-btn"        data-size="8"  onclick="selectSize(8)"><span style="width:8px;height:8px"></span></button>
+            <button class="size-btn"        data-size="16" onclick="selectSize(16)"><span style="width:16px;height:16px"></span></button>
+            <button class="size-btn"        data-size="28" onclick="selectSize(28)"><span style="width:28px;height:28px"></span></button>
+          </div>
+
+          <div class="tool-divider"></div>
+
+          <!-- Undo + Clear -->
+          <button class="tool-btn" id="btn-undo" title="Undo (Ctrl+Z)" onclick="onUndoCanvas()">↩</button>
+          <button class="tool-btn" id="btn-clear" title="Clear canvas" onclick="onClearCanvas()">🗑️</button>
+        </div>
+      </main>
+
+      <!-- Right: Chat -->
+      <aside id="chat-panel">
+        <h3 class="panel-title">Chat</h3>
+        <div id="chat-messages" class="chat-messages"></div>
+        <!-- Reaction bar (guessers only, visible during drawing) -->
+        <div id="reaction-bar" class="reaction-bar hidden">
+          <button class="reaction-btn" title="Nice!" onclick="onSendReaction('👍')">👍</button>
+          <button class="reaction-btn" title="Meh"   onclick="onSendReaction('😐')">😐</button>
+          <button class="reaction-btn" title="Nope"  onclick="onSendReaction('👎')">👎</button>
+          <button class="reaction-btn" title="Wow!"  onclick="onSendReaction('🔥')">🔥</button>
+          <button class="reaction-btn" title="Haha"  onclick="onSendReaction('😂')">😂</button>
+        </div>
+        <div class="chat-input-row">
+          <input id="chat-input" type="text" maxlength="200" placeholder="Type to guess…" autocomplete="off"
+                 onkeydown="if(event.key==='Enter') onSendChat()" />
+          <button class="btn btn-sm btn-primary" onclick="onSendChat()">Send</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       OVERLAYS
+  ══════════════════════════════════════════════════════════ -->
+
+  <!-- Word Choice -->
+  <div id="overlay-word-choice" class="overlay hidden">
+    <div class="overlay-card">
+      <h2>Choose a word to draw!</h2>
+      <p class="overlay-sub" id="word-choice-timer">15 seconds</p>
+      <div id="word-choice-buttons" class="word-choice-buttons"></div>
+    </div>
+  </div>
+
+  <!-- Turn End -->
+  <div id="overlay-turn-end" class="overlay hidden">
+    <div class="overlay-card">
+      <h2>Round Over!</h2>
+      <p class="overlay-sub">The word was:</p>
+      <div id="turn-end-word" class="revealed-word"></div>
+      <ul id="turn-end-scores" class="score-list"></ul>
+    </div>
+  </div>
+
+  <!-- Round End -->
+  <div id="overlay-round-end" class="overlay hidden">
+    <div class="overlay-card">
+      <h2 id="round-end-title">Round Complete!</h2>
+      <ul id="round-end-scores" class="score-list"></ul>
+    </div>
+  </div>
+
+  <!-- Game End -->
+  <div id="overlay-game-end" class="overlay hidden">
+    <div class="overlay-card">
+      <h2>Game Over!</h2>
+      <div id="game-end-winner" class="winner-banner"></div>
+      <ul id="game-end-scores" class="score-list"></ul>
+      <button id="btn-play-again" class="btn btn-primary" onclick="onPlayAgain()">Play Again</button>
+      <button class="btn btn-ghost" onclick="onLeaveRoom()">Back to Room</button>
+      <a class="btn btn-ghost" href="/" style="margin-top:0.4rem">← Game Hub</a>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/game.js"></script>
+</body>
+</html>

@@ -3,282 +3,224 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Scribble-O</title>
+  <title>Huddle — Family Game Hub</title>
   <link rel="stylesheet" href="/style.css" />
+  <style>
+    body { overflow: auto; }
+
+    /* ── Hub layout ── */
+    .hub {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 3rem 1.5rem 4rem;
+    }
+
+    /* ── Hero ── */
+    .hero { text-align: center; margin-bottom: 3.5rem; }
+
+    .hub-title-wrap { margin-bottom: 0.5rem; }
+
+    .hub-title {
+      font-size: clamp(3.5rem, 10vw, 6rem);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #e94560 0%, #a78bfa 60%, #60a5fa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      display: inline-block;
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+    .hub-title.fade-out {
+      opacity: 0;
+      transform: translateY(-12px);
+    }
+
+    .hub-sub {
+      font-size: 1.05rem;
+      color: var(--text-dim);
+      margin-top: 0.5rem;
+      letter-spacing: 0.04em;
+    }
+
+    .lang-dots {
+      display: flex;
+      justify-content: center;
+      gap: 0.4rem;
+      margin-top: 1rem;
+    }
+    .lang-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background 0.3s, transform 0.3s;
+    }
+    .lang-dot.active { background: var(--accent); transform: scale(1.4); }
+
+    /* ── Section label ── */
+    .section-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin-bottom: 1.25rem;
+      text-align: center;
+    }
+
+    /* ── Games grid ── */
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1.25rem;
+      width: 100%;
+      max-width: 860px;
+    }
+
+    .game-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.75rem 1.5rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+      transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .game-card:not(.coming-soon):hover {
+      border-color: var(--accent);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 32px rgba(233,69,96,0.18);
+    }
+    .game-card.coming-soon { opacity: 0.5; cursor: default; }
+
+    .game-icon { font-size: 2.4rem; line-height: 1; margin-bottom: 0.25rem; }
+
+    .game-name {
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+    }
+    .game-desc {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      line-height: 1.5;
+      flex: 1;
+    }
+
+    .game-badge {
+      position: absolute;
+      top: 1rem; right: 1rem;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: rgba(233,69,96,0.15);
+      border: 1px solid rgba(233,69,96,0.3);
+      color: var(--accent);
+    }
+    .game-badge.soon {
+      background: rgba(136,136,170,0.12);
+      border-color: var(--border);
+      color: var(--text-dim);
+    }
+
+    .btn-play {
+      margin-top: 0.75rem;
+      padding: 0.5rem 1.25rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: background 0.15s;
+      width: 100%;
+      text-align: center;
+    }
+    .btn-play:hover { background: #c73652; }
+  </style>
 </head>
 <body>
+  <div class="hub">
 
-  <!-- ══════════════════════════════════════════════════════════
-       LOBBY SCREEN
-  ══════════════════════════════════════════════════════════ -->
-  <div id="lobby-screen" class="screen">
-    <div class="lobby-card">
-      <h1 class="logo">Scribble<span class="logo-o">-O</span></h1>
-      <p class="tagline">Draw. Guess. Win.</p>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hub-title-wrap">
+        <span class="hub-title" id="hub-title">Huddle</span>
+      </div>
+      <p class="hub-sub">Your family game hub &nbsp;·&nbsp; Play together, anywhere</p>
+      <div class="lang-dots">
+        <span class="lang-dot active" id="dot-0"></span>
+        <span class="lang-dot"       id="dot-1"></span>
+        <span class="lang-dot"       id="dot-2"></span>
+      </div>
+    </section>
 
-      <div class="input-group">
-        <label for="username-input">Your Name</label>
-        <input id="username-input" type="text" maxlength="20" placeholder="Enter your name…" autocomplete="off" />
+    <!-- Games -->
+    <p class="section-label">Choose a game</p>
+    <div class="games-grid">
+
+      <!-- Scribble-O -->
+      <div class="game-card">
+        <span class="game-badge">Live</span>
+        <div class="game-icon">🎨</div>
+        <div class="game-name">Scribble-O</div>
+        <div class="game-desc">Draw a word, make your friends guess it. The classic real-time drawing &amp; guessing game — up to 12 players.</div>
+        <a class="btn-play" href="/play">Play Now</a>
       </div>
 
-      <!-- Direct Join Panel (shown when arriving via invite link) -->
-      <div id="panel-direct-join" class="hidden">
-        <p class="direct-join-msg">You've been invited to play! Enter your name to jump in.</p>
-        <button class="btn btn-primary" onclick="onDirectJoin()">Join Game</button>
-        <p class="lobby-switch"><button class="link-btn" onclick="showLobbyDefault()">← Back to lobby</button></p>
+      <!-- Coming soon 1 -->
+      <div class="game-card coming-soon">
+        <span class="game-badge soon">Coming Soon</span>
+        <div class="game-icon">🧠</div>
+        <div class="game-name">Trivia Blitz</div>
+        <div class="game-desc">Race to answer trivia questions across dozens of categories. How fast can you think?</div>
       </div>
 
-      <!-- Create Room Panel -->
-      <div id="panel-create">
-        <div class="settings-grid">
-          <div class="setting">
-            <label for="set-rounds">Rounds</label>
-            <select id="set-rounds">
-              <option value="2">2</option>
-              <option value="3" selected>3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-            </select>
-          </div>
-          <div class="setting">
-            <label for="set-drawtime">Draw Time</label>
-            <select id="set-drawtime">
-              <option value="60">60 s</option>
-              <option value="80" selected>80 s</option>
-              <option value="100">100 s</option>
-              <option value="120">120 s</option>
-            </select>
-          </div>
-          <div class="setting">
-            <label for="set-maxplayers">Max Players</label>
-            <select id="set-maxplayers">
-              <option value="4">4</option>
-              <option value="6">6</option>
-              <option value="8" selected>8</option>
-              <option value="12">12</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="setting custom-words-section">
-          <label for="set-customwords">Custom Words <span class="hint">(one per line, max 100)</span></label>
-          <textarea id="set-customwords" rows="4" placeholder="apple&#10;rocket ship&#10;electric guitar"></textarea>
-        </div>
-
-        <div class="setting checkbox-row">
-          <input type="checkbox" id="set-customonly" />
-          <label for="set-customonly">Use custom words only</label>
-        </div>
-
-        <button id="btn-create" class="btn btn-primary" onclick="onCreateRoom()">Create Room</button>
-        <p class="lobby-switch">Have a room code? <button class="link-btn" onclick="switchTab('join')">Join a room instead →</button></p>
+      <!-- Coming soon 2 -->
+      <div class="game-card coming-soon">
+        <span class="game-badge soon">Coming Soon</span>
+        <div class="game-icon">💣</div>
+        <div class="game-name">Word Bomb</div>
+        <div class="game-desc">Find a word matching the pattern before the clock runs out — or the bomb goes off!</div>
       </div>
 
-      <!-- Join Room Panel -->
-      <div id="panel-join" class="hidden">
-        <div class="input-group">
-          <label for="join-code">Room Code</label>
-          <input id="join-code" type="text" maxlength="6" placeholder="ABC123" autocomplete="off"
-                 style="text-transform:uppercase;letter-spacing:0.15em" />
-        </div>
-        <button id="btn-join" class="btn btn-primary" onclick="onJoinRoom()">Join Room</button>
-        <p class="lobby-switch"><button class="link-btn" onclick="switchTab('create')">← Create a new room instead</button></p>
-      </div>
-
-      <div id="lobby-error" class="error-msg hidden"></div>
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════
-       WAITING ROOM SCREEN
-  ══════════════════════════════════════════════════════════ -->
-  <div id="waiting-screen" class="screen hidden">
-    <div class="waiting-card">
-      <div class="waiting-header">
-        <h2>Waiting Room</h2>
-        <button class="btn btn-sm btn-ghost" onclick="onLeaveRoom()">Leave</button>
-      </div>
+  <script>
+    const LANGS = [
+      { text: 'Huddle',   lang: 'en' },
+      { text: '欢聚',     lang: 'zh' },
+      { text: 'Reunión',  lang: 'es' },
+    ];
+    let idx = 0;
+    const titleEl = document.getElementById('hub-title');
 
-      <div id="room-code-section" class="room-code-display">
-        <span class="room-code-label">Room Code</span>
-        <span id="waiting-room-code" class="room-code-value">——</span>
-        <button class="btn btn-xs btn-ghost" onclick="copyRoomCode()" title="Copy code">⧉ Copy</button>
-        <button class="btn btn-xs btn-primary" onclick="copyInviteLink()" title="Copy invite link">🔗 Invite Link</button>
-      </div>
-      <div id="invite-copied-msg" class="invite-copied hidden">Link copied!</div>
+    function cycleLang() {
+      titleEl.classList.add('fade-out');
+      setTimeout(() => {
+        document.getElementById(`dot-${idx}`).classList.remove('active');
+        idx = (idx + 1) % LANGS.length;
+        titleEl.textContent = LANGS[idx].text;
+        titleEl.lang = LANGS[idx].lang;
+        document.getElementById(`dot-${idx}`).classList.add('active');
+        titleEl.classList.remove('fade-out');
+      }, 360);
+    }
 
-      <div class="waiting-info" id="waiting-info">Waiting for players…</div>
-
-      <ul id="waiting-player-list" class="waiting-player-list"></ul>
-
-      <!-- Category Picker (owner only) -->
-      <div id="cat-picker-section" class="cat-picker">
-        <div class="cat-picker-header">
-          <span class="cat-picker-label">Category</span>
-          <span id="cat-winner-badge" class="cat-winner-badge">Mixed (default)</span>
-        </div>
-        <div id="cat-picker-grid" class="cat-picker-grid"></div>
-      </div>
-
-      <div id="waiting-controls">
-        <button id="btn-start" class="btn btn-primary hidden" onclick="onStartGame()">
-          Start Game
-        </button>
-        <p id="waiting-status" class="waiting-status">Waiting for the host to start…</p>
-      </div>
-
-      <div id="waiting-error" class="error-msg hidden"></div>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════════
-       GAME SCREEN
-  ══════════════════════════════════════════════════════════ -->
-  <div id="game-screen" class="screen hidden">
-
-    <!-- Top bar -->
-    <div id="game-topbar">
-      <div id="topbar-round">Round <span id="top-round">1</span>/<span id="top-totalrounds">3</span></div>
-      <div id="topbar-word">
-        <span id="word-display" class="word-display">— — —</span>
-      </div>
-      <div id="topbar-timer">
-        <svg class="timer-ring" viewBox="0 0 36 36">
-          <circle class="timer-bg" cx="18" cy="18" r="15.9" />
-          <circle id="timer-arc" class="timer-arc" cx="18" cy="18" r="15.9" />
-        </svg>
-        <span id="timer-number" class="timer-number">80</span>
-      </div>
-    </div>
-
-    <!-- Main 3-column layout -->
-    <div id="game-layout">
-
-      <!-- Left: Player List -->
-      <aside id="player-panel">
-        <h3 class="panel-title">Players</h3>
-        <ul id="player-list"></ul>
-      </aside>
-
-      <!-- Center: Canvas + Tools -->
-      <main id="canvas-panel">
-        <div id="canvas-wrapper">
-          <canvas id="game-canvas" width="800" height="560"></canvas>
-          <div id="canvas-overlay-msg" class="canvas-overlay-msg hidden"></div>
-        </div>
-
-        <!-- Drawing Toolbar (only visible when drawing) -->
-        <div id="toolbar" class="toolbar hidden">
-          <!-- Tools -->
-          <div class="tool-group" id="tool-buttons">
-            <button class="tool-btn active" data-tool="pencil" title="Pencil"      onclick="selectTool('pencil')">✏️</button>
-            <button class="tool-btn"        data-tool="eraser" title="Eraser"      onclick="selectTool('eraser')">◻</button>
-            <button class="tool-btn"        data-tool="fill"   title="Fill Bucket" onclick="selectTool('fill')">🪣</button>
-            <!-- Shapes dropdown trigger -->
-            <button class="tool-btn" id="btn-shapes" title="Shapes" onclick="toggleShapesPicker(event)">▭</button>
-          </div>
-          <!-- Shapes popup (portaled to body via JS positioning) -->
-          <div id="shapes-dropdown" class="shapes-dropdown hidden">
-            <div class="shapes-grid">
-              <button class="shape-opt" data-shape="line"     title="Line"             onclick="selectShape('line')">╱</button>
-              <button class="shape-opt" data-shape="arrow"    title="Arrow"            onclick="selectShape('arrow')">↗</button>
-              <button class="shape-opt" data-shape="rect"     title="Rectangle"        onclick="selectShape('rect')">▭</button>
-              <button class="shape-opt" data-shape="rect-r"   title="Rounded Rect"     onclick="selectShape('rect-r')">▢</button>
-              <button class="shape-opt" data-shape="ellipse"  title="Circle / Ellipse" onclick="selectShape('ellipse')">○</button>
-              <button class="shape-opt" data-shape="triangle" title="Triangle"         onclick="selectShape('triangle')">△</button>
-              <button class="shape-opt" data-shape="star"     title="Star"             onclick="selectShape('star')">★</button>
-              <button class="shape-opt" data-shape="hexagon"  title="Hexagon"          onclick="selectShape('hexagon')">⬡</button>
-            </div>
-          </div>
-
-          <div class="tool-divider"></div>
-
-          <!-- Color swatches -->
-          <div class="color-palette" id="color-palette"></div>
-          <input type="color" id="color-picker" value="#000000" title="Custom color" />
-
-          <div class="tool-divider"></div>
-
-          <!-- Brush sizes -->
-          <div class="size-group" id="size-buttons">
-            <button class="size-btn active" data-size="4"  onclick="selectSize(4)"><span style="width:4px;height:4px"></span></button>
-            <button class="size-btn"        data-size="8"  onclick="selectSize(8)"><span style="width:8px;height:8px"></span></button>
-            <button class="size-btn"        data-size="16" onclick="selectSize(16)"><span style="width:16px;height:16px"></span></button>
-            <button class="size-btn"        data-size="28" onclick="selectSize(28)"><span style="width:28px;height:28px"></span></button>
-          </div>
-
-          <div class="tool-divider"></div>
-
-          <!-- Undo + Clear -->
-          <button class="tool-btn" id="btn-undo" title="Undo (Ctrl+Z)" onclick="onUndoCanvas()">↩</button>
-          <button class="tool-btn" id="btn-clear" title="Clear canvas" onclick="onClearCanvas()">🗑️</button>
-        </div>
-      </main>
-
-      <!-- Right: Chat -->
-      <aside id="chat-panel">
-        <h3 class="panel-title">Chat</h3>
-        <div id="chat-messages" class="chat-messages"></div>
-        <!-- Reaction bar (guessers only, visible during drawing) -->
-        <div id="reaction-bar" class="reaction-bar hidden">
-          <button class="reaction-btn" title="Nice!" onclick="onSendReaction('👍')">👍</button>
-          <button class="reaction-btn" title="Meh"   onclick="onSendReaction('😐')">😐</button>
-          <button class="reaction-btn" title="Nope"  onclick="onSendReaction('👎')">👎</button>
-          <button class="reaction-btn" title="Wow!"  onclick="onSendReaction('🔥')">🔥</button>
-          <button class="reaction-btn" title="Haha"  onclick="onSendReaction('😂')">😂</button>
-        </div>
-        <div class="chat-input-row">
-          <input id="chat-input" type="text" maxlength="200" placeholder="Type to guess…" autocomplete="off"
-                 onkeydown="if(event.key==='Enter') onSendChat()" />
-          <button class="btn btn-sm btn-primary" onclick="onSendChat()">Send</button>
-        </div>
-      </aside>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════════
-       OVERLAYS
-  ══════════════════════════════════════════════════════════ -->
-
-  <!-- Word Choice -->
-  <div id="overlay-word-choice" class="overlay hidden">
-    <div class="overlay-card">
-      <h2>Choose a word to draw!</h2>
-      <p class="overlay-sub" id="word-choice-timer">15 seconds</p>
-      <div id="word-choice-buttons" class="word-choice-buttons"></div>
-    </div>
-  </div>
-
-  <!-- Turn End -->
-  <div id="overlay-turn-end" class="overlay hidden">
-    <div class="overlay-card">
-      <h2>Round Over!</h2>
-      <p class="overlay-sub">The word was:</p>
-      <div id="turn-end-word" class="revealed-word"></div>
-      <ul id="turn-end-scores" class="score-list"></ul>
-    </div>
-  </div>
-
-  <!-- Round End -->
-  <div id="overlay-round-end" class="overlay hidden">
-    <div class="overlay-card">
-      <h2 id="round-end-title">Round Complete!</h2>
-      <ul id="round-end-scores" class="score-list"></ul>
-    </div>
-  </div>
-
-  <!-- Game End -->
-  <div id="overlay-game-end" class="overlay hidden">
-    <div class="overlay-card">
-      <h2>Game Over!</h2>
-      <div id="game-end-winner" class="winner-banner"></div>
-      <ul id="game-end-scores" class="score-list"></ul>
-      <button id="btn-play-again" class="btn btn-primary" onclick="onPlayAgain()">Play Again</button>
-      <button class="btn btn-ghost" onclick="onLeaveRoom()">Back to Lobby</button>
-    </div>
-  </div>
-
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="/game.js"></script>
+    setInterval(cycleLang, 2600);
+  </script>
 </body>
 </html>

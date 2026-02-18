@@ -10,9 +10,14 @@ const io = new Server(server, {
   cors: { origin: '*' },
 });
 
-// Serve index.html for invite links so client-side JS can read the room code
+// Game page
+app.get('/play', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'play.html'));
+});
+
+// Invite links — serve the game page so client JS can read the room code
 app.get('/join/:code', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'play.html'));
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
