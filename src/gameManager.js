@@ -562,7 +562,7 @@ class GameManager {
 
     room.timer = setTimeout(() => {
       this._startNextTurn(room);
-    }, 5000);
+    }, 3000);
   }
 
   _endRound(room) {
@@ -576,14 +576,16 @@ class GameManager {
     });
 
     if (room.currentRound >= room.totalRounds) {
-      room.timer = setTimeout(() => this._endGame(room), 8000);
+      // Final round — brief pause then game over
+      room.timer = setTimeout(() => this._endGame(room), 4000);
     } else {
+      // Mid-game round — short pause then continue
       room.timer = setTimeout(() => {
         room.currentRound++;
         room.drawerOrder = [...room.players.keys()];
         room.drawerIndex = -1;
         this._startNextTurn(room);
-      }, 8000);
+      }, 3000);
     }
   }
 
@@ -597,7 +599,7 @@ class GameManager {
       winner: scores[0] || null,
     });
 
-    // Auto-reset to lobby after 60 seconds
+    // Auto-reset to lobby after 15 seconds
     room.timer = setTimeout(() => {
       if (room.state === 'game_end') {
         room.state = 'lobby';
@@ -615,7 +617,7 @@ class GameManager {
           categoryVotes: {},
         });
       }
-    }, 60000);
+    }, 15000);
   }
 
   // ─── Draw Event Relay ─────────────────────────────────────────────────────

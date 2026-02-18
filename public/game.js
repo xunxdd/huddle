@@ -240,7 +240,6 @@ function initSocket() {
     setToolbarVisible(false);
     updateTimer(0, State.drawTime);
     showTurnEndOverlay(word, scores, drawer === State.playerId ? drawerPoints : null);
-    // Update scores in room
     if (State.room) {
       scores.forEach(s => {
         const p = State.room.players.find(p => p.id === s.id);
@@ -248,6 +247,8 @@ function initSocket() {
       });
     }
     renderPlayerList();
+    // Auto-hide after 2.5s (server moves on at 3s)
+    setTimeout(() => hideAllOverlays(), 2500);
   });
 
   s.on('game:roundEnd', ({ round, totalRounds, scores }) => {
@@ -261,6 +262,10 @@ function initSocket() {
       });
     }
     renderPlayerList();
+    // Auto-hide mid-game round overlay so the next turn flows in smoothly
+    if (!isLast) {
+      setTimeout(() => hideAllOverlays(), 2500);
+    }
   });
 
   s.on('game:ended', ({ scores, winner }) => {
