@@ -74,6 +74,12 @@ textarea { resize: vertical; font-family: inherit; }
 .lobby-switch {
   text-align: center; margin-top: 0.75rem; font-size: 0.82rem; color: var(--text-dim);
 }
+.direct-join-msg {
+  font-size: 0.95rem; color: var(--text-dim); margin-bottom: 1.25rem; text-align: center;
+}
+.invite-copied {
+  font-size: 0.78rem; color: var(--green); text-align: center; margin-top: 0.3rem;
+}
 .link-btn {
   background: none; border: none; color: var(--accent); cursor: pointer;
   font-size: inherit; padding: 0; text-decoration: underline;

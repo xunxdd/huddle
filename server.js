@@ -12,6 +12,11 @@ const io = new Server(server, {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Serve index.html for invite links so client-side JS can read the room code
+app.get('/join/:code', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 const gm = new GameManager(io);
 
 io.on('connection', (socket) => {

@@ -62,8 +62,8 @@ document.addEventListener('DOMContentLoaded', () => {
   buildColorPalette();
   initCanvas();
   initSocket();
+  checkInviteUrl();
 
-  // Enter key on username → focus create button
   document.getElementById('username-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('btn-create').click();
   });
@@ -535,10 +535,9 @@ function floodFill(ctx, startX, startY, fillColorHex) {
 //  UI — LOBBY
 // ══════════════════════════════════════════════════════════
 function switchTab(tab) {
-  document.getElementById('tab-create').classList.toggle('active', tab === 'create');
-  document.getElementById('tab-join').classList.toggle('active',   tab === 'join');
   document.getElementById('panel-create').classList.toggle('hidden', tab !== 'create');
   document.getElementById('panel-join').classList.toggle('hidden',   tab !== 'join');
+  document.getElementById('panel-direct-join').classList.add('hidden');
 }
 
 function showError(msg) {
@@ -586,6 +585,50 @@ function onJoinRoom() {
 function copyRoomCode() {
   const code = document.getElementById('waiting-room-code').textContent;
   navigator.clipboard.writeText(code).catch(() => {});
+}
+
+function copyInviteLink() {
+  const code = document.getElementById('waiting-room-code').textContent;
+  const link = `${window.location.origin}/join/${code}`;
+  navigator.clipboard.writeText(link).catch(() => {});
+
+  const msg = document.getElementById('invite-copied-msg');
+  if (!msg) return;
+  msg.classList.remove('hidden');
+  setTimeout(() => msg.classList.add('hidden'), 2500);
+}
+
+function checkInviteUrl() {
+  const match = window.location.pathname.match(/^\/join\/([A-Z0-9]{6})$/i);
+  if (!match) return;
+
+  const code = match[1].toUpperCase();
+  // Store code so onDirectJoin() can use it
+  State._inviteCode = code;
+
+  // Hide create/join panels, show direct-join panel
+  document.getElementById('panel-create').classList.add('hidden');
+  document.getElementById('panel-join').classList.add('hidden');
+  document.getElementById('panel-direct-join').classList.remove('hidden');
+
+  // Enter key submits direct join
+  document.getElementById('username-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') onDirectJoin();
+  });
+}
+
+function onDirectJoin() {
+  const username = getUsername();
+  if (!username) { showLobbyError('Please enter your name.'); return; }
+  State.socket.emit('room:join', { username, roomId: State._inviteCode });
+}
+
+function showLobbyDefault() {
+  State._inviteCode = null;
+  // Clear the invite path from the URL without reloading
+  window.history.replaceState(null, '', '/');
+  document.getElementById('panel-direct-join').classList.add('hidden');
+  document.getElementById('panel-create').classList.remove('hidden');
 }
 
 // ══════════════════════════════════════════════════════════

@@ -21,6 +21,13 @@
         <input id="username-input" type="text" maxlength="20" placeholder="Enter your name…" autocomplete="off" />
       </div>
 
+      <!-- Direct Join Panel (shown when arriving via invite link) -->
+      <div id="panel-direct-join" class="hidden">
+        <p class="direct-join-msg">You've been invited to play! Enter your name to jump in.</p>
+        <button class="btn btn-primary" onclick="onDirectJoin()">Join Game</button>
+        <p class="lobby-switch"><button class="link-btn" onclick="showLobbyDefault()">← Back to lobby</button></p>
+      </div>
+
       <!-- Create Room Panel -->
       <div id="panel-create">
         <div class="settings-grid">
@@ -96,7 +103,9 @@
         <span class="room-code-label">Room Code</span>
         <span id="waiting-room-code" class="room-code-value">——</span>
         <button class="btn btn-xs btn-ghost" onclick="copyRoomCode()" title="Copy code">⧉ Copy</button>
+        <button class="btn btn-xs btn-primary" onclick="copyInviteLink()" title="Copy invite link">🔗 Invite Link</button>
       </div>
+      <div id="invite-copied-msg" class="invite-copied hidden">Link copied!</div>
 
       <div class="waiting-info" id="waiting-info">Waiting for players…</div>
 
