@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Huddle — Family Game Hub</title>
+  <title>Cat in a Cradle — Family Game Hub</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/style.css" />
   <style>
     body { overflow: auto; }
@@ -23,7 +24,7 @@
     /* Fixed height + relative so the two overlapping spans don't shift layout */
     .hub-title-wrap {
       position: relative;
-      height: clamp(5rem, 13vw, 8.5rem);
+      height: clamp(3rem, 8vw, 5.5rem);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -33,7 +34,7 @@
     /* Both spans sit on top of each other; cross-fade between them */
     .hub-title {
       position: absolute;
-      font-size: clamp(3.5rem, 10vw, 6rem);
+      font-size: clamp(2rem, 5.5vw, 3.8rem);
       font-weight: 900;
       letter-spacing: -0.03em;
       background: linear-gradient(135deg, #e94560 0%, #a78bfa 60%, #60a5fa 100%);
@@ -163,10 +164,10 @@
     <!-- Hero -->
     <section class="hero">
       <div class="hub-title-wrap">
-        <span class="hub-title" id="hub-title-a">Huddle</span>
+        <span class="hub-title" id="hub-title-a">Cat in a Cradle</span>
         <span class="hub-title" id="hub-title-b" aria-hidden="true"></span>
       </div>
-      <p class="hub-sub">Your family game hub &nbsp;·&nbsp; Play together, anywhere</p>
+      <p class="hub-sub">Family game hub &nbsp;·&nbsp; Play together, anywhere</p>
       <div class="lang-dots">
         <span class="lang-dot active" id="dot-0"></span>
         <span class="lang-dot"       id="dot-1"></span>
@@ -222,9 +223,9 @@
 
   <script>
     const LANGS = [
-      { text: 'Huddle',  lang: 'en' },
-      { text: '欢聚',    lang: 'zh' },
-      { text: 'Reunión', lang: 'es' },
+      { text: 'Cat in a Cradle', lang: 'en' },
+      { text: '猫咪乐园',         lang: 'zh' },
+      { text: 'Gato en la Cuna', lang: 'es' },
     ];
 
     let idx   = 0;
