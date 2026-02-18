@@ -296,6 +296,33 @@ textarea { resize: vertical; font-family: inherit; }
 .chat-msg.type-guess   { color: var(--text); }
 .chat-msg.type-chat    { color: var(--text); }
 
+/* Reaction bar */
+.reaction-bar {
+  display: flex; gap: 0.3rem; justify-content: center;
+  padding: 0.35rem 0.5rem; border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.reaction-btn {
+  font-size: 1.35rem; background: transparent;
+  border: 1px solid transparent; border-radius: 8px;
+  padding: 0.2rem 0.35rem; cursor: pointer; line-height: 1;
+  transition: transform 0.1s, background 0.12s;
+}
+.reaction-btn:hover  { background: var(--surface); transform: scale(1.2); }
+.reaction-btn:active { transform: scale(0.88); }
+
+/* Floating reaction animation */
+.floating-reaction {
+  position: fixed; font-size: 2.2rem;
+  pointer-events: none; z-index: 500;
+  animation: floatUp 2s ease-out forwards;
+}
+@keyframes floatUp {
+  0%   { opacity: 1; transform: translateY(0)     scale(1);   }
+  40%  { opacity: 1; transform: translateY(-70px)  scale(1.4); }
+  100% { opacity: 0; transform: translateY(-150px) scale(0.7); }
+}
+
 .chat-input-row {
   display: flex; gap: 0.4rem; padding: 0.5rem 0.5rem;
   border-top: 1px solid var(--border); flex-shrink: 0;

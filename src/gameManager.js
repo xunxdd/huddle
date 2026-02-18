@@ -652,6 +652,15 @@ class GameManager {
     socket.to(room.id).emit('draw:shape', data);
   }
 
+  handleReaction(socket, { roomId, emoji } = {}) {
+    const room = this.rooms.get(roomId);
+    if (!room || room.state !== 'drawing') return;
+    if (room.currentDrawer === socket.id) return; // drawer can't react
+    const allowed = ['👍','👎','😐','🔥','😂'];
+    if (!allowed.includes(emoji)) return;
+    this.io.to(roomId).emit('reaction:broadcast', { emoji });
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   _getPlayerRoom(socket) {

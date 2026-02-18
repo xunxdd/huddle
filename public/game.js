@@ -59,6 +59,8 @@ const State = {
   // Pre-game category voting
   categoryVotes: {},      // { categoryName: count }
   myVoteCategory: null,   // the category this player voted for
+
+  lastReactionTime: 0,    // cooldown for emoji reactions
 };
 
 // ─── Init ─────────────────────────────────────────────────
@@ -199,12 +201,12 @@ function initSocket() {
     clearCanvas();
 
     if (!State.isDrawer) {
-      // Show blank display + letter count
       updateWordDisplay(wordDisplay + `  (${wordLength} letters)`);
       setDrawingEnabled(false);
       setChatEnabled(true);
     }
 
+    setReactionBarVisible(!State.isDrawer);
     updateTimer(State.timeLeft, State.drawTime);
   });
 
@@ -260,6 +262,7 @@ function initSocket() {
   s.on('game:turnEnd', ({ word, drawer, drawerName, drawerPoints, correctGuessers, scores }) => {
     setDrawingEnabled(false);
     setToolbarVisible(false);
+    setReactionBarVisible(false);
     updateTimer(0, State.drawTime);
     showTurnEndOverlay(word, scores, drawer === State.playerId ? drawerPoints : null);
     if (State.room) {
@@ -342,6 +345,11 @@ function initSocket() {
       State.ctx.drawImage(img, 0, 0);
     };
     img.src = dataUrl;
+  });
+
+  // ── Reactions ──
+  s.on('reaction:broadcast', ({ emoji }) => {
+    showFloatingReaction(emoji);
   });
 
   // ── Chat ──
@@ -991,6 +999,32 @@ function setDrawingEnabled(enabled) {
 
 function setToolbarVisible(visible) {
   document.getElementById('toolbar').classList.toggle('hidden', !visible);
+}
+
+function setReactionBarVisible(visible) {
+  document.getElementById('reaction-bar').classList.toggle('hidden', !visible);
+}
+
+function onSendReaction(emoji) {
+  const now = Date.now();
+  if (now - State.lastReactionTime < 1500) return; // 1.5s cooldown
+  State.lastReactionTime = now;
+  State.socket.emit('reaction:send', { roomId: State.roomId, emoji });
+}
+
+function showFloatingReaction(emoji) {
+  const canvas = document.getElementById('game-canvas');
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = 'floating-reaction';
+  el.textContent = emoji;
+  // Random horizontal position across the canvas
+  const x = rect.left + rect.width * (0.1 + Math.random() * 0.8);
+  el.style.left = `${x}px`;
+  el.style.top  = `${rect.bottom - 30}px`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
 }
 
 function setChatEnabled(enabled) {

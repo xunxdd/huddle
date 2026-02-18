@@ -219,6 +219,14 @@
       <aside id="chat-panel">
         <h3 class="panel-title">Chat</h3>
         <div id="chat-messages" class="chat-messages"></div>
+        <!-- Reaction bar (guessers only, visible during drawing) -->
+        <div id="reaction-bar" class="reaction-bar hidden">
+          <button class="reaction-btn" title="Nice!" onclick="onSendReaction('👍')">👍</button>
+          <button class="reaction-btn" title="Meh"   onclick="onSendReaction('😐')">😐</button>
+          <button class="reaction-btn" title="Nope"  onclick="onSendReaction('👎')">👎</button>
+          <button class="reaction-btn" title="Wow!"  onclick="onSendReaction('🔥')">🔥</button>
+          <button class="reaction-btn" title="Haha"  onclick="onSendReaction('😂')">😂</button>
+        </div>
         <div class="chat-input-row">
           <input id="chat-input" type="text" maxlength="200" placeholder="Type to guess…" autocomplete="off"
                  onkeydown="if(event.key==='Enter') onSendChat()" />

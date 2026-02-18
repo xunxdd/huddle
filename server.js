@@ -66,6 +66,10 @@ io.on('connection', (socket) => {
     gm.handleShape(socket, data);
   });
 
+  socket.on('reaction:send', (data) => {
+    gm.handleReaction(socket, data || {});
+  });
+
   socket.on('room:categoryVote', (data) => {
     gm.handlePreGameCategoryVote(socket, data || {});
   });
