@@ -20,9 +20,19 @@
     /* ── Hero ── */
     .hero { text-align: center; margin-bottom: 3.5rem; }
 
-    .hub-title-wrap { margin-bottom: 0.5rem; }
+    /* Fixed height + relative so the two overlapping spans don't shift layout */
+    .hub-title-wrap {
+      position: relative;
+      height: clamp(5rem, 13vw, 8.5rem);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 0.5rem;
+    }
 
+    /* Both spans sit on top of each other; cross-fade between them */
     .hub-title {
+      position: absolute;
       font-size: clamp(3.5rem, 10vw, 6rem);
       font-weight: 900;
       letter-spacing: -0.03em;
@@ -30,12 +40,8 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      display: inline-block;
-      transition: opacity 0.35s ease, transform 0.35s ease;
-    }
-    .hub-title.fade-out {
-      opacity: 0;
-      transform: translateY(-12px);
+      white-space: nowrap;
+      transition: opacity 1.4s ease-in-out;
     }
 
     .hub-sub {
@@ -157,7 +163,8 @@
     <!-- Hero -->
     <section class="hero">
       <div class="hub-title-wrap">
-        <span class="hub-title" id="hub-title">Huddle</span>
+        <span class="hub-title" id="hub-title-a">Huddle</span>
+        <span class="hub-title" id="hub-title-b" aria-hidden="true"></span>
       </div>
       <p class="hub-sub">Your family game hub &nbsp;·&nbsp; Play together, anywhere</p>
       <div class="lang-dots">
@@ -201,26 +208,50 @@
 
   <script>
     const LANGS = [
-      { text: 'Huddle',   lang: 'en' },
-      { text: '欢聚',     lang: 'zh' },
-      { text: 'Reunión',  lang: 'es' },
+      { text: 'Huddle',  lang: 'en' },
+      { text: '欢聚',    lang: 'zh' },
+      { text: 'Reunión', lang: 'es' },
     ];
-    let idx = 0;
-    const titleEl = document.getElementById('hub-title');
+
+    let idx   = 0;
+    let front = 'a'; // which span is currently visible
+    const els = {
+      a: document.getElementById('hub-title-a'),
+      b: document.getElementById('hub-title-b'),
+    };
+
+    // Start b invisible
+    els.b.style.opacity = '0';
 
     function cycleLang() {
-      titleEl.classList.add('fade-out');
+      const nextIdx    = (idx + 1) % LANGS.length;
+      const incoming   = front === 'a' ? els.b : els.a;
+      const outgoing   = front === 'a' ? els.a : els.b;
+
+      // Prepare incoming text while it's still invisible
+      incoming.textContent = LANGS[nextIdx].text;
+      incoming.lang        = LANGS[nextIdx].lang;
+      // Disable transition briefly so the text swap isn't animated
+      incoming.style.transition = 'none';
+      incoming.style.opacity    = '0';
+      incoming.getBoundingClientRect(); // force reflow
+
+      // Cross-fade: both elements transition simultaneously
+      incoming.style.transition = 'opacity 1.4s ease-in-out';
+      outgoing.style.transition = 'opacity 1.4s ease-in-out';
+      incoming.style.opacity    = '1';
+      outgoing.style.opacity    = '0';
+
+      // Update dots at the midpoint (when both texts are ~50% opacity)
+      front = front === 'a' ? 'b' : 'a';
       setTimeout(() => {
         document.getElementById(`dot-${idx}`).classList.remove('active');
-        idx = (idx + 1) % LANGS.length;
-        titleEl.textContent = LANGS[idx].text;
-        titleEl.lang = LANGS[idx].lang;
+        idx = nextIdx;
         document.getElementById(`dot-${idx}`).classList.add('active');
-        titleEl.classList.remove('fade-out');
-      }, 360);
+      }, 700);
     }
 
-    setInterval(cycleLang, 2600);
+    setInterval(cycleLang, 3200);
   </script>
 </body>
 </html>
