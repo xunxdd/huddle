@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Family Wordle 🟩 — Huddle</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    body { overflow: auto; }
+
+    /* ── Shared ── */
+    .fw-title { font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; text-align: center; margin-bottom: 0.25rem; }
+    .fw-tagline { text-align: center; color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.9rem; }
+
+    /* ── Tabs ── */
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+    .tab-btn {
+      flex: 1; padding: 0.5rem; border: 1px solid var(--border);
+      border-radius: 8px; background: transparent; color: var(--text-dim);
+      font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: all 0.15s;
+    }
+    .tab-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Lobby ── */
+    #screen-lobby .lobby-card { max-height: 90vh; overflow-y: auto; }
+
+    /* ── Waiting room ── */
+    #screen-waiting .lobby-card { width: 520px; }
+    .room-code-display { text-align: center; margin: 1rem 0; }
+    .room-code-display .code {
+      font-size: 2.5rem; font-weight: 900; letter-spacing: 0.15em;
+      color: var(--accent); font-family: monospace;
+    }
+    .code-label { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+    .player-list { margin: 1rem 0; }
+    .player-list-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 0.5rem; }
+    .player-list-items { display: flex; flex-direction: column; gap: 0.4rem; }
+    .player-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.75rem; background: var(--surface2); border-radius: 8px; font-size: 0.9rem; }
+    .player-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: #fff; flex-shrink: 0; }
+    .player-crown { font-size: 0.9rem; margin-left: auto; }
+    .copy-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Game screen ── */
+    #screen-game { width: 100vw; min-height: 100vh; display: flex; flex-direction: column; align-items: stretch; padding: 0; }
+    #screen-game.hidden { display: none !important; }
+
+    /* Top bar */
+    .fw-topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0.6rem 1.25rem; flex-shrink: 0;
+    }
+    .fw-topbar-left { font-size: 0.85rem; color: var(--text-dim); }
+    .fw-topbar-left strong { color: var(--text); }
+    .fw-topbar-center { font-size: 1rem; font-weight: 800; letter-spacing: -0.01em; }
+    .fw-timer {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 1.1rem; font-weight: 800;
+      color: var(--green);
+    }
+    .fw-timer.warn { color: var(--yellow); }
+    .fw-timer.danger { color: var(--accent); }
+
+    /* Main layout */
+    .fw-main { display: grid; grid-template-columns: 1fr 290px; flex: 1; min-height: 0; }
+
+    /* Center panel */
+    .fw-center {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 1.5rem 1.5rem 1rem; gap: 1rem; overflow-y: auto;
+    }
+
+    /* Wordle grid */
+    .fw-grid { display: flex; flex-direction: column; gap: 5px; }
+    .fw-row { display: flex; gap: 5px; }
+    .fw-tile {
+      width: 52px; height: 52px; border: 2px solid var(--border);
+      border-radius: 4px; display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; font-weight: 900; text-transform: uppercase;
+      transition: border-color 0.1s;
+      backface-visibility: hidden;
+    }
+    .fw-tile.filled { border-color: var(--text-dim); }
+    .fw-tile.correct { background: var(--green);  border-color: var(--green);  color: #fff; }
+    .fw-tile.present { background: var(--yellow); border-color: var(--yellow); color: #1a1a2e; }
+    .fw-tile.absent  { background: #3a3a4a;       border-color: #3a3a4a;       color: #aaa; }
+    .fw-tile.skipped { background: #2a2a3a;       border-color: #2a2a3a;       color: #555; }
+
+    /* Flip animation */
+    @keyframes fw-flip-in  { 0%{transform:rotateX(0)} 50%{transform:rotateX(-90deg)} }
+    @keyframes fw-flip-out { 50%{transform:rotateX(-90deg)} 100%{transform:rotateX(0)} }
+    .fw-tile.flip-in  { animation: fw-flip-in  0.2s ease forwards; }
+    .fw-tile.flip-out { animation: fw-flip-out 0.2s ease forwards; }
+
+    /* Pop when letter typed */
+    @keyframes fw-pop { 0%{transform:scale(1)} 50%{transform:scale(1.1)} 100%{transform:scale(1)} }
+    .fw-tile.pop { animation: fw-pop 0.1s ease; }
+
+    /* Shake on invalid */
+    @keyframes fw-shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+    .fw-row.shake { animation: fw-shake 0.35s ease; }
+
+    /* Current row input display */
+    .fw-input-area {
+      display: flex; flex-direction: column; align-items: center; gap: 0.6rem; width: 100%;
+    }
+    .fw-hidden-input { position: absolute; opacity: 0; pointer-events: none; }
+    .fw-feedback {
+      height: 1.3rem; font-size: 0.88rem; font-weight: 600; text-align: center;
+      color: var(--accent);
+    }
+
+    /* On-screen keyboard */
+    .fw-keyboard { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+    .fw-kb-row { display: flex; gap: 5px; }
+    .fw-kb-key {
+      height: 52px; min-width: 34px; border-radius: 6px;
+      background: #3a3a4a; border: none; color: var(--text);
+      font-size: 0.85rem; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s; padding: 0 4px;
+      user-select: none;
+    }
+    .fw-kb-key.wide { min-width: 52px; font-size: 0.75rem; }
+    .fw-kb-key:active { transform: scale(0.95); }
+    .fw-kb-key.correct { background: var(--green);  color: #fff; }
+    .fw-kb-key.present { background: var(--yellow); color: #1a1a2e; }
+    .fw-kb-key.absent  { background: #252535;       color: #555; }
+    .fw-kb-key:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Sidebar ── */
+    .fw-sidebar { border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+    .fw-sidebar-section { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); }
+    .fw-sidebar-title { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-dim); margin-bottom: 0.6rem; }
+
+    /* Players with submission badges */
+    .fw-player-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; padding: 0.25rem 0; }
+    .fw-player-name { flex: 1; font-weight: 600; }
+    .fw-player-score { font-weight: 700; color: var(--yellow); font-size: 0.8rem; min-width: 36px; text-align: right; }
+    .fw-submitted-badge { font-size: 0.9rem; color: var(--green); }
+    .fw-player-row.is-me .fw-player-name::after { content: ' (you)'; color: var(--text-dim); font-weight: 400; font-size: 0.78rem; }
+
+    /* Round recap */
+    .fw-recap { flex: 1; overflow-y: auto; padding: 0.75rem 1rem; }
+    .fw-recap-empty { color: var(--text-dim); font-size: 0.82rem; font-style: italic; }
+    .fw-recap-row { font-size: 0.82rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
+    .fw-recap-row:last-child { border-bottom: none; }
+    .fw-recap-label { font-weight: 700; margin-bottom: 0.2rem; }
+    .fw-recap-word { font-family: monospace; font-size: 1rem; font-weight: 900; color: var(--accent); }
+    .fw-recap-tiles { display: flex; gap: 2px; margin: 0.3rem 0; }
+    .fw-mini-tile { width: 16px; height: 16px; border-radius: 2px; font-size: 0.45rem; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 900; text-transform: uppercase; }
+    .fw-mini-tile.correct { background: var(--green); }
+    .fw-mini-tile.present { background: var(--yellow); color: #1a1a2e; }
+    .fw-mini-tile.absent  { background: #3a3a4a; }
+    .fw-mini-tile.skipped { background: #2a2a3a; color: #555; }
+    .fw-recap-pts { color: var(--yellow); font-weight: 700; font-size: 0.8rem; }
+    .fw-recap-sub { color: var(--text-dim); font-size: 0.76rem; margin-top: 0.2rem; }
+    .fw-recap-sub-item { display: flex; gap: 0.3rem; align-items: center; padding: 0.15rem 0; }
+
+    /* Overlays */
+    .fw-overlay { position: fixed; inset: 0; background: rgba(15,15,26,0.85); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .fw-overlay.hidden { display: none !important; }
+    .fw-overlay-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 2rem 2.5rem; min-width: 320px; max-width: 520px; text-align: center; box-shadow: var(--shadow); }
+    .fw-overlay-title { font-size: 1.5rem; font-weight: 900; margin-bottom: 1rem; }
+    .fw-overlay-scores { margin: 1rem 0; text-align: left; }
+    .overlay-score-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    .overlay-score-row:last-child { border-bottom: none; }
+    .overlay-rank { width: 22px; text-align: center; color: var(--text-dim); font-size: 0.8rem; }
+    .overlay-name { flex: 1; font-weight: 600; }
+    .overlay-pts { font-weight: 700; color: var(--yellow); }
+
+    /* Win confetti overlay */
+    .fw-confetti-overlay { pointer-events: none; position: fixed; inset: 0; z-index: 90; overflow: hidden; }
+    .fw-confetti-dot {
+      position: absolute; width: 10px; height: 10px; border-radius: 50%;
+      animation: confetti-fall linear forwards;
+    }
+    @keyframes confetti-fall {
+      0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+    }
+
+    /* General buttons */
+    .btn { display: inline-block; padding: 0.6rem 1.5rem; border-radius: 10px; font-size: 0.95rem; font-weight: 700; cursor: pointer; border: none; transition: background 0.15s; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #c73652; }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-full { width: 100%; margin-top: 0.5rem; padding: 0.7rem; }
+    .back-link { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--text-dim); text-decoration: none; font-size: 0.85rem; margin-bottom: 1rem; transition: color 0.15s; }
+    .back-link:hover { color: var(--text); }
+
+    /* Responsive */
+    @media (max-width: 680px) {
+      .fw-main { grid-template-columns: 1fr; }
+      .fw-sidebar { border-left: none; border-top: 1px solid var(--border); max-height: 220px; }
+      .fw-tile { width: 42px; height: 42px; font-size: 1.1rem; }
+      .fw-kb-key { height: 44px; min-width: 28px; font-size: 0.78rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Lobby ──────────────────────────────────────────────────────── -->
+  <div id="screen-lobby" class="screen">
+    <div class="lobby-card">
+      <a href="/" class="back-link">← Back to Huddle</a>
+      <div class="fw-title">🟩 Family Wordle</div>
+      <p class="fw-tagline">Everyone guesses together — the best word each round is played!</p>
+
+      <!-- Invite link direct-join -->
+      <div id="lobby-direct-join" class="hidden">
+        <p style="color:var(--text-dim);font-size:0.9rem;margin-bottom:1rem;text-align:center">You've been invited! Enter your name to join.</p>
+        <div class="input-group">
+          <label class="input-label">Your name</label>
+          <input id="inp-username-direct" class="input-field" type="text" placeholder="Enter your name" maxlength="20" autocomplete="off" />
+        </div>
+        <button id="btn-direct-join" class="btn btn-primary btn-full">Join Game →</button>
+        <p style="text-align:center;margin-top:0.75rem">
+          <button id="btn-back-to-lobby" style="background:none;border:none;color:var(--text-dim);font-size:0.85rem;cursor:pointer">← Back to lobby</button>
+        </p>
+      </div>
+
+      <div id="lobby-username-step">
+        <div class="input-group">
+          <label class="input-label">Your name</label>
+          <input id="inp-username" class="input-field" type="text" placeholder="Enter your name" maxlength="20" autocomplete="off" />
+        </div>
+        <button id="btn-continue" class="btn btn-primary btn-full">Continue →</button>
+      </div>
+
+      <div id="lobby-choice-step" class="hidden">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="create">Create Room</button>
+          <button class="tab-btn" data-tab="join">Join Room</button>
+        </div>
+        <div id="tab-create" class="tab-panel active">
+          <div class="input-group">
+            <label class="input-label">Time per round</label>
+            <select id="inp-time" class="input-field">
+              <option value="30">30 seconds</option>
+              <option value="60" selected>60 seconds</option>
+              <option value="90">90 seconds</option>
+              <option value="120">120 seconds</option>
+            </select>
+          </div>
+          <button id="btn-create" class="btn btn-primary btn-full">Create Room</button>
+        </div>
+        <div id="tab-join" class="tab-panel">
+          <div class="input-group">
+            <label class="input-label">Room code</label>
+            <input id="inp-room-code" class="input-field" type="text" placeholder="e.g. ABCD12" maxlength="6"
+              autocomplete="off" style="text-transform:uppercase;letter-spacing:0.1em" />
+          </div>
+          <button id="btn-join" class="btn btn-primary btn-full">Join Room</button>
+        </div>
+      </div>
+
+      <p id="lobby-error" class="hidden" style="color:var(--accent);font-size:0.85rem;margin-top:0.75rem;text-align:center"></p>
+    </div>
+  </div>
+
+  <!-- ── Waiting Room ───────────────────────────────────────────────── -->
+  <div id="screen-waiting" class="screen hidden">
+    <div class="lobby-card" style="width:520px">
+      <a href="/" class="back-link" id="btn-leave-waiting">← Leave room</a>
+      <div class="fw-title">🟩 Family Wordle</div>
+      <div class="room-code-display">
+        <div class="code-label">Room Code</div>
+        <div class="code" id="waiting-room-code">------</div>
+        <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:0.4rem">
+          <button class="copy-btn" id="btn-copy-code">Copy Code</button>
+          <button class="copy-btn" id="btn-copy-link">🔗 Invite Link</button>
+        </div>
+        <p id="link-copied-msg" class="hidden" style="font-size:0.75rem;color:var(--green);margin-top:0.3rem">Link copied!</p>
+      </div>
+      <div class="player-list">
+        <div class="player-list-title">Players (<span id="waiting-player-count">0</span>)</div>
+        <div class="player-list-items" id="waiting-players"></div>
+      </div>
+      <p id="waiting-hint" style="font-size:0.8rem;color:var(--text-dim);text-align:center;margin-bottom:0.75rem">Share the room code with friends!</p>
+      <button id="btn-start" class="btn btn-primary btn-full hidden">Start Game</button>
+      <p id="waiting-not-owner" class="hidden" style="text-align:center;color:var(--text-dim);font-size:0.85rem">Waiting for the host to start…</p>
+    </div>
+  </div>
+
+  <!-- ── Game Screen ───────────────────────────────────────────────── -->
+  <div id="screen-game" class="hidden" style="display:none">
+
+    <!-- Top bar -->
+    <div class="fw-topbar">
+      <div class="fw-topbar-left">
+        Guess <strong id="hud-guess-num">1</strong> / <span id="hud-max-guesses">6</span>
+      </div>
+      <div class="fw-topbar-center">🟩 Family Wordle</div>
+      <div class="fw-timer" id="hud-timer">⏱ 60</div>
+    </div>
+
+    <!-- Main layout -->
+    <div class="fw-main">
+
+      <!-- Center: grid + input + keyboard -->
+      <div class="fw-center">
+        <div class="fw-grid" id="fw-grid"></div>
+
+        <div class="fw-input-area">
+          <input id="fw-hidden-input" class="fw-hidden-input" type="text"
+            maxlength="6" autocomplete="off" autocorrect="off" spellcheck="false" />
+          <div class="fw-feedback" id="fw-feedback"></div>
+        </div>
+
+        <div class="fw-keyboard" id="fw-keyboard">
+          <div class="fw-kb-row" data-row="0">
+            <button class="fw-kb-key" data-key="Q">Q</button>
+            <button class="fw-kb-key" data-key="W">W</button>
+            <button class="fw-kb-key" data-key="E">E</button>
+            <button class="fw-kb-key" data-key="R">R</button>
+            <button class="fw-kb-key" data-key="T">T</button>
+            <button class="fw-kb-key" data-key="Y">Y</button>
+            <button class="fw-kb-key" data-key="U">U</button>
+            <button class="fw-kb-key" data-key="I">I</button>
+            <button class="fw-kb-key" data-key="O">O</button>
+            <button class="fw-kb-key" data-key="P">P</button>
+          </div>
+          <div class="fw-kb-row" data-row="1">
+            <button class="fw-kb-key" data-key="A">A</button>
+            <button class="fw-kb-key" data-key="S">S</button>
+            <button class="fw-kb-key" data-key="D">D</button>
+            <button class="fw-kb-key" data-key="F">F</button>
+            <button class="fw-kb-key" data-key="G">G</button>
+            <button class="fw-kb-key" data-key="H">H</button>
+            <button class="fw-kb-key" data-key="J">J</button>
+            <button class="fw-kb-key" data-key="K">K</button>
+            <button class="fw-kb-key" data-key="L">L</button>
+          </div>
+          <div class="fw-kb-row" data-row="2">
+            <button class="fw-kb-key wide" data-key="Enter">Enter</button>
+            <button class="fw-kb-key" data-key="Z">Z</button>
+            <button class="fw-kb-key" data-key="X">X</button>
+            <button class="fw-kb-key" data-key="C">C</button>
+            <button class="fw-kb-key" data-key="V">V</button>
+            <button class="fw-kb-key" data-key="B">B</button>
+            <button class="fw-kb-key" data-key="N">N</button>
+            <button class="fw-kb-key" data-key="M">M</button>
+            <button class="fw-kb-key wide" data-key="Backspace">⌫</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="fw-sidebar">
+        <div class="fw-sidebar-section">
+          <div class="fw-sidebar-title">Players</div>
+          <div id="fw-players-list"></div>
+        </div>
+        <div class="fw-recap" id="fw-recap">
+          <div class="fw-sidebar-title">Round recap</div>
+          <div class="fw-recap-empty">Waiting for first round…</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Game Over Overlay ─────────────────────────────────────────── -->
+  <div id="overlay-game-over" class="fw-overlay hidden">
+    <div class="fw-overlay-card">
+      <div style="font-size:2.5rem;margin-bottom:0.5rem" id="game-over-emoji">🏆</div>
+      <div class="fw-overlay-title" id="game-over-title">Game Over!</div>
+      <div id="game-over-word" style="font-size:0.95rem;color:var(--text-dim);margin-bottom:0.75rem"></div>
+      <div class="fw-overlay-scores" id="game-over-scores"></div>
+      <div style="margin-top:1rem;display:flex;gap:0.75rem;justify-content:center">
+        <button id="btn-play-again" class="btn btn-primary">Play Again</button>
+        <a href="/" class="btn btn-secondary">Home</a>
+      </div>
+      <p style="color:var(--text-dim);font-size:0.8rem;margin-top:0.75rem" id="game-over-countdown"></p>
+    </div>
+  </div>
+
+  <!-- Confetti container -->
+  <div class="fw-confetti-overlay hidden" id="fw-confetti"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/wordle.js"></script>
+</body>
+</html>
