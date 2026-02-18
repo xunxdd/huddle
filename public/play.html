@@ -138,7 +138,10 @@
 
     <!-- Top bar -->
     <div id="game-topbar">
-      <div id="topbar-round">Round <span id="top-round">1</span>/<span id="top-totalrounds">3</span></div>
+      <div id="topbar-round" style="display:flex;align-items:center;gap:1rem">
+        <a href="/" style="color:var(--text-dim);text-decoration:none;font-size:0.85rem;transition:color 0.15s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-dim)'">⌂ Home</a>
+        <span>Round <span id="top-round">1</span>/<span id="top-totalrounds">3</span></span>
+      </div>
       <div id="topbar-word">
         <span id="word-display" class="word-display">— — —</span>
       </div>

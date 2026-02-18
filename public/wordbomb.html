@@ -524,8 +524,9 @@
 
     <!-- Top bar -->
     <div class="wb-topbar">
-      <div class="wb-round-info">
-        Round <strong id="hud-round">1</strong> / <span id="hud-total-rounds">5</span>
+      <div class="wb-round-info" style="display:flex;align-items:center;gap:1rem">
+        <a href="/" style="color:var(--text-dim);text-decoration:none;font-size:0.85rem;transition:color 0.15s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-dim)'">⌂ Home</a>
+        <span>Round <strong id="hud-round">1</strong> / <span id="hud-total-rounds">5</span></span>
       </div>
       <div class="wb-bomb-combo">
         <span class="wb-bomb-icon">💣</span>

@@ -9,8 +9,31 @@
     body { overflow: auto; }
 
     /* ── Shared ── */
-    .fw-title { font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; text-align: center; margin-bottom: 0.25rem; }
+    .fw-title { font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; text-align: center; margin-bottom: 0.25rem; display:flex; align-items:center; justify-content:center; gap:0.5rem; }
     .fw-tagline { text-align: center; color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.9rem; }
+
+    /* ── Reusable grid icon ── */
+    .fw-grid-icon {
+      display: inline-grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2px;
+      flex-shrink: 0;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .fw-grid-icon span { border-radius: 2px; display:block; }
+    .fw-grid-icon span:nth-child(1) { background: #6aaa64; }
+    .fw-grid-icon span:nth-child(2) { background: #c9b458; }
+    .fw-grid-icon span:nth-child(3) { background: #565f7e; }
+    .fw-grid-icon span:nth-child(4) { background: #565f7e; }
+    .fw-grid-icon span:nth-child(5) { background: #6aaa64; }
+    .fw-grid-icon span:nth-child(6) { background: #565f7e; }
+    .fw-grid-icon span:nth-child(7) { background: #6aaa64; }
+    .fw-grid-icon span:nth-child(8) { background: #6aaa64; }
+    .fw-grid-icon span:nth-child(9) { background: #c9b458; }
+    /* Size variants */
+    .fw-grid-icon.lg span { width: 13px; height: 13px; }
+    .fw-grid-icon.sm span { width:  8px; height:  8px; }
 
     /* ── Tabs ── */
     .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
@@ -208,7 +231,7 @@
   <div id="screen-lobby" class="screen">
     <div class="lobby-card">
       <a href="/" class="back-link">← Back to Huddle</a>
-      <div class="fw-title">🟩 Family Wordle</div>
+      <div class="fw-title"><span class="fw-grid-icon lg"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span> Family Wordle</div>
       <p class="fw-tagline">Everyone guesses together — the best word each round is played!</p>
 
       <!-- Invite link direct-join -->
@@ -267,7 +290,7 @@
   <div id="screen-waiting" class="screen hidden">
     <div class="lobby-card" style="width:520px">
       <a href="/" class="back-link" id="btn-leave-waiting">← Leave room</a>
-      <div class="fw-title">🟩 Family Wordle</div>
+      <div class="fw-title"><span class="fw-grid-icon lg"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span> Family Wordle</div>
       <div class="room-code-display">
         <div class="code-label">Room Code</div>
         <div class="code" id="waiting-room-code">------</div>
@@ -292,10 +315,11 @@
 
     <!-- Top bar -->
     <div class="fw-topbar">
-      <div class="fw-topbar-left">
-        Guess <strong id="hud-guess-num">1</strong> / <span id="hud-max-guesses">6</span>
+      <div class="fw-topbar-left" style="display:flex;align-items:center;gap:1rem">
+        <a href="/" style="color:var(--text-dim);text-decoration:none;font-size:0.85rem;transition:color 0.15s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-dim)'">⌂ Home</a>
+        <span>Guess <strong id="hud-guess-num">1</strong> / <span id="hud-max-guesses">6</span></span>
       </div>
-      <div class="fw-topbar-center">🟩 Family Wordle</div>
+      <div class="fw-topbar-center" style="display:flex;align-items:center;gap:0.4rem"><span class="fw-grid-icon sm"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span> Family Wordle</div>
       <div class="fw-timer" id="hud-timer">⏱ 60</div>
     </div>
 
