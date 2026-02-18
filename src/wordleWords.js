@@ -79,18 +79,26 @@ const ANSWER_WORDS = [
   /^[a-z]{6}$/.test(w) && a.indexOf(w) === i   // exactly 6 letters, deduplicated
 );
 
-// Load full dictionary for guess validation; fall back to ANSWER_WORDS
+// Load full dictionary for guess validation.
+// Priority: bundled words6.txt → system /usr/share/dict/words → ANSWER_WORDS fallback
 function loadValidWords() {
-  try {
-    const words = fs.readFileSync('/usr/share/dict/words', 'utf8')
-      .split('\n')
-      .filter(w => /^[a-z]{6}$/.test(w));
-    console.log(`[wordle] Loaded ${ANSWER_WORDS.length} answer words, ${words.length} valid guesses`);
-    return new Set(words);
-  } catch {
-    console.log(`[wordle] Loaded ${ANSWER_WORDS.length} answer words, dict unavailable – using answer list as fallback`);
-    return new Set(ANSWER_WORDS);
+  const paths = [
+    require('path').join(__dirname, 'words6.txt'),
+    '/usr/share/dict/words',
+  ];
+  for (const p of paths) {
+    try {
+      const words = fs.readFileSync(p, 'utf8')
+        .split('\n')
+        .filter(w => /^[a-z]{6}$/.test(w));
+      if (words.length > 0) {
+        console.log(`[wordle] Loaded ${ANSWER_WORDS.length} answer words, ${words.length} valid guesses`);
+        return new Set(words);
+      }
+    } catch { /* try next */ }
   }
+  console.log(`[wordle] Loaded ${ANSWER_WORDS.length} answer words, using answer list as fallback`);
+  return new Set(ANSWER_WORDS);
 }
 
 const VALID_WORDS = loadValidWords();

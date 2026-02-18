@@ -165,6 +165,7 @@ function initSocket() {
   });
 
   s.on('game:turnStart', ({ drawer, drawerName, round, totalRounds, state }) => {
+    _clearCanvasSync();
     State.isDrawer = drawer === State.playerId;
     State.hasGuessed = false;
     State.currentWord = null;
@@ -213,6 +214,7 @@ function initSocket() {
   s.on('game:yourWord', ({ word }) => {
     State.currentWord = word;
     updateWordDisplay(word);
+    State.isDrawer = true;
     setDrawingEnabled(true);
     setToolbarVisible(true);
     setChatEnabled(false);
@@ -220,6 +222,8 @@ function initSocket() {
     // Save blank canvas as first undo state
     State.drawHistory = [];
     saveDrawSnapshot();
+    // Periodically sync canvas so guessers can recover from any missed strokes
+    _startCanvasSync();
   });
 
   s.on('game:hint', ({ wordDisplay, hintNumber }) => {
@@ -260,6 +264,8 @@ function initSocket() {
   });
 
   s.on('game:turnEnd', ({ word, drawer, drawerName, drawerPoints, correctGuessers, scores }) => {
+    State.isDrawer = false;
+    _clearCanvasSync();
     setDrawingEnabled(false);
     setToolbarVisible(false);
     setReactionBarVisible(false);
@@ -299,6 +305,7 @@ function initSocket() {
   });
 
   s.on('game:reset', ({ room, categoryVotes }) => {
+    _clearCanvasSync();
     State.room = room;
     State.isOwner = room.owner === State.playerId;
     State.hasGuessed = false;
@@ -396,6 +403,20 @@ function clearCanvas() {
 
 let lastEmit = 0;
 const EMIT_INTERVAL = 16; // ~60fps throttle
+
+// Canvas sync — drawer periodically sends a snapshot so guessers can recover from missed strokes
+let _canvasSyncTimer = null;
+function _clearCanvasSync() {
+  if (_canvasSyncTimer) { clearInterval(_canvasSyncTimer); _canvasSyncTimer = null; }
+}
+function _startCanvasSync() {
+  _clearCanvasSync();
+  _canvasSyncTimer = setInterval(() => {
+    if (!State.isDrawer || !State.canvas) return;
+    const dataUrl = State.canvas.toDataURL('image/png');
+    State.socket.emit('draw:restore', { dataUrl, roomId: State.roomId });
+  }, 8000);
+}
 
 function getPos(e) {
   const rect = State.canvas.getBoundingClientRect();
@@ -916,6 +937,7 @@ function onStartGame() {
 }
 
 function onLeaveRoom() {
+  _clearCanvasSync();
   State.socket.emit('room:leave');
   State.roomId = null;
   State.room = null;
@@ -986,11 +1008,11 @@ function setCanvasOverlay(msg) {
 }
 
 function setDrawingEnabled(enabled) {
-  State.isDrawer = enabled;
+  // NOTE: do NOT set State.isDrawer here — that's set by socket event handlers
   const canvas = State.canvas;
   if (enabled) {
     canvas.classList.remove('not-drawing');
-    canvas.style.cursor = State.drawing.tool === 'fill' ? 'crosshair' : 'crosshair';
+    canvas.style.cursor = 'crosshair';
   } else {
     canvas.classList.add('not-drawing');
     canvas.style.cursor = 'default';
