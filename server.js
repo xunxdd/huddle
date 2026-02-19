@@ -5,7 +5,8 @@ const path = require('path');
 const GameManager = require('./src/gameManager');
 const WordBombManager = require('./src/wordBombManager');
 const WordleManager = require('./src/wordleManager');
-const Game24Manager = require('./src/game24Manager');
+const Game24Manager      = require('./src/game24Manager');
+const CountdownManager   = require('./src/countdownManager');
 
 const app = express();
 const server = http.createServer(app);
@@ -47,12 +48,21 @@ app.get('/game24/join/:code', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'game24.html'));
 });
 
+// Countdown Numbers page + invite links
+app.get('/countdown', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'countdown.html'));
+});
+app.get('/countdown/join/:code', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'countdown.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const gm  = new GameManager(io);
 const wbm = new WordBombManager(io);
 const wm  = new WordleManager(io);
 const g24 = new Game24Manager(io);
+const cdm = new CountdownManager(io);
 
 io.on('connection', (socket) => {
   console.log(`+ connected: ${socket.id}`);
@@ -130,12 +140,21 @@ io.on('connection', (socket) => {
   socket.on('g24:start',  id => g24.startGame(socket, id));
   socket.on('g24:submit', d  => g24.handleSubmit(socket, d || {}));
 
+  // ── Countdown Numbers ─────────────────────────────────────────────────────
+  socket.on('cd:create', d  => cdm.createRoom(socket, d || {}));
+  socket.on('cd:join',   d  => cdm.joinRoom(socket, d || {}));
+  socket.on('cd:leave',  () => cdm.leaveRoom(socket));
+  socket.on('cd:start',  id => cdm.startGame(socket, id));
+  socket.on('cd:pick',   d  => cdm.handlePick(socket, d || {}));
+  socket.on('cd:submit', d  => cdm.handleSubmit(socket, d || {}));
+
   socket.on('disconnect', () => {
     console.log(`- disconnected: ${socket.id}`);
     gm.leaveRoom(socket);
     wbm.leaveRoom(socket);
     wm.leaveRoom(socket);
     g24.leaveRoom(socket);
+    cdm.leaveRoom(socket);
   });
 });
 
