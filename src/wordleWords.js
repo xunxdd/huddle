@@ -92,8 +92,10 @@ function loadValidWords() {
         .split('\n')
         .filter(w => /^[a-z]{6}$/.test(w));
       if (words.length > 0) {
-        console.log(`[wordle] Loaded ${ANSWER_WORDS.length} answer words, ${words.length} valid guesses`);
-        return new Set(words);
+        // Always include answer words so they're never rejected as invalid guesses
+        const set = new Set([...words, ...ANSWER_WORDS]);
+        console.log(`[wordle] Loaded ${ANSWER_WORDS.length} answer words, ${set.size} valid guesses`);
+        return set;
       }
     } catch { /* try next */ }
   }
