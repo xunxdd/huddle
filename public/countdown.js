@@ -13,6 +13,7 @@ let hasSubmitted  = false;
 let currentPlayers = [];          // [{id, name, score}]
 let submittedSet  = new Set();    // socket IDs that submitted this round
 let pickAutoTimer = null;         // client-side auto-pick countdown
+let roomOwnerId   = null;         // tracks who can reset the room
 
 // ── Screens ────────────────────────────────────────────────────────────────────
 const screens = {
@@ -528,10 +529,8 @@ function showFeedback(msg, type) {
 
 // ── Play again ─────────────────────────────────────────────────────────────────
 btnPlayAgain.addEventListener('click', () => {
-  overlayGameOver.classList.add('hidden');
-  socket.emit('cd:leave');
-  showScreen('lobby');
-  resetLobby();
+  socket.emit('cd:reset', myRoomId);
+  // cd:reset event from server will move everyone to the waiting screen
 });
 
 // ── Socket handlers ────────────────────────────────────────────────────────────
@@ -539,9 +538,10 @@ btnPlayAgain.addEventListener('click', () => {
 socket.on('connect', () => { myId = socket.id; });
 
 socket.on('cd:joined', ({ roomId, playerId, room }) => {
-  myId     = playerId;
-  myRoomId = roomId;
-  timerMax = room.timePerRound;
+  myId        = playerId;
+  myRoomId    = roomId;
+  timerMax    = room.timePerRound;
+  roomOwnerId = room.owner;
   renderWaiting(room);
   showScreen('waiting');
 });
@@ -552,7 +552,7 @@ socket.on('cd:playerJoined', ({ room }) => {
 });
 
 socket.on('cd:playerLeft', ({ room }) => {
-  // Update waiting room if visible
+  roomOwnerId = room.owner; // ownership may have transferred
   const waitingVisible = !screens.waiting.classList.contains('hidden');
   if (waitingVisible) renderWaiting(room);
   SFX.leave();
@@ -560,7 +560,8 @@ socket.on('cd:playerLeft', ({ room }) => {
 
 socket.on('cd:started', ({ room }) => {
   SFX.gameStart();
-  timerMax = room.timePerRound;
+  timerMax    = room.timePerRound;
+  roomOwnerId = room.owner;
   currentPlayers = room.players;
   hudTotalRounds.textContent = room.rounds;
   cdRecap.style.display = 'none';
@@ -668,19 +669,13 @@ socket.on('cd:gameOver', ({ scores, winner }) => {
   }
 
   renderOverlayScores(gameOverScores, scores);
-  overlayGameOver.classList.remove('hidden');
 
-  let secs = 20;
-  gameOverCountdown.textContent = `Auto-returning to lobby in ${secs}s…`;
-  const iv = setInterval(() => {
-    secs--;
-    if (secs <= 0) {
-      clearInterval(iv);
-      gameOverCountdown.textContent = '';
-    } else {
-      gameOverCountdown.textContent = `Auto-returning to lobby in ${secs}s…`;
-    }
-  }, 1000);
+  // Host sees Play Again; others wait for host to restart
+  const amOwner = myId === roomOwnerId;
+  btnPlayAgain.style.display    = amOwner ? '' : 'none';
+  gameOverCountdown.textContent = amOwner ? '' : 'Waiting for host to start a new game…';
+
+  overlayGameOver.classList.remove('hidden');
 });
 
 socket.on('cd:reset', ({ room }) => {
@@ -688,8 +683,9 @@ socket.on('cd:reset', ({ room }) => {
   overlayRoundEnd.classList.add('hidden');
   overlayPick.classList.add('hidden');
   if (pickAutoTimer) { clearInterval(pickAutoTimer); pickAutoTimer = null; }
-  myRoomId = room.id;
-  timerMax = room.timePerRound;
+  myRoomId       = room.id;
+  timerMax       = room.timePerRound;
+  roomOwnerId    = room.owner;
   currentPlayers = room.players;
   renderWaiting(room);
   showScreen('waiting');

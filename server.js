@@ -147,6 +147,7 @@ io.on('connection', (socket) => {
   socket.on('cd:start',  id => cdm.startGame(socket, id));
   socket.on('cd:pick',   d  => cdm.handlePick(socket, d || {}));
   socket.on('cd:submit', d  => cdm.handleSubmit(socket, d || {}));
+  socket.on('cd:reset',  id => cdm.resetRoom(socket, id));
 
   socket.on('disconnect', () => {
     console.log(`- disconnected: ${socket.id}`);
