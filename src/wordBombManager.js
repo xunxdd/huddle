@@ -98,6 +98,7 @@ class WordBombManager {
       timeLeft: 0,
       // Track how many players have gone this round
       turnsThisRound: 0,
+      autoResetTimer: null,
     };
 
     this.rooms.set(roomId, room);
@@ -422,21 +423,33 @@ class WordBombManager {
     console.log(`[WB] Game ended in room ${room.id}. Winner: ${winner?.name}`);
 
     // Auto-reset to lobby after 15s
-    setTimeout(() => {
+    room.autoResetTimer = setTimeout(() => {
       if (!room || !this.rooms.has(room.id)) return;
-      room.state = 'lobby';
-      room.currentRound = 0;
-      room.activeIndex = -1;
-      room.playerOrder = [];
-      room.currentCombo = '';
-      room.usedWords = new Set();
-      room.turnsThisRound = 0;
-      for (const p of room.players.values()) {
-        p.score = 0;
-        p.turnsTaken = 0;
-      }
-      this.io.to(room.id).emit('wb:reset', { room: this._roomPublic(room) });
+      this._doReset(room);
     }, 15000);
+  }
+
+  _doReset(room) {
+    if (room.autoResetTimer) { clearTimeout(room.autoResetTimer); room.autoResetTimer = null; }
+    room.state = 'lobby';
+    room.currentRound = 0;
+    room.activeIndex = -1;
+    room.playerOrder = [];
+    room.currentCombo = '';
+    room.usedWords = new Set();
+    room.turnsThisRound = 0;
+    for (const p of room.players.values()) {
+      p.score = 0;
+      p.turnsTaken = 0;
+    }
+    this.io.to(room.id).emit('wb:reset', { room: this._roomPublic(room) });
+  }
+
+  resetRoom(socket, roomId) {
+    const room = this.rooms.get(roomId);
+    if (!room) { socket.emit('wb:error', { message: 'Room not found' }); return; }
+    if (room.owner !== socket.id) { socket.emit('wb:error', { message: 'Only the host can reset' }); return; }
+    this._doReset(room);
   }
 
   // ─── Utilities ─────────────────────────────────────────────────────────────

@@ -125,6 +125,7 @@ io.on('connection', (socket) => {
   socket.on('wb:leave',      ()   => wbm.leaveRoom(socket));
   socket.on('wb:start',      (id) => wbm.startGame(socket, id));
   socket.on('wb:submitWord', (d)  => wbm.handleSubmitWord(socket, d || {}));
+  socket.on('wb:reset',      (id) => wbm.resetRoom(socket, id));
 
   // ── Family Wordle ─────────────────────────────────────────────────────────
   socket.on('fw:create',      d  => wm.createRoom(socket, d || {}));
@@ -132,6 +133,7 @@ io.on('connection', (socket) => {
   socket.on('fw:leave',       () => wm.leaveRoom(socket));
   socket.on('fw:start',       id => wm.startGame(socket, id));
   socket.on('fw:submitGuess', d  => wm.handleSubmitGuess(socket, d || {}));
+  socket.on('fw:reset',       id => wm.resetRoom(socket, id));
 
   // ── The 24 Game ───────────────────────────────────────────────────────────
   socket.on('g24:create', d  => g24.createRoom(socket, d || {}));
@@ -139,6 +141,7 @@ io.on('connection', (socket) => {
   socket.on('g24:leave',  () => g24.leaveRoom(socket));
   socket.on('g24:start',  id => g24.startGame(socket, id));
   socket.on('g24:submit', d  => g24.handleSubmit(socket, d || {}));
+  socket.on('g24:reset',  id => g24.resetRoom(socket, id));
 
   // ── Countdown Numbers ─────────────────────────────────────────────────────
   socket.on('cd:create', d  => cdm.createRoom(socket, d || {}));

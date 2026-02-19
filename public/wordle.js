@@ -12,6 +12,7 @@ let inputEnabled = false;
 let currentInput = '';         // letters typed so far (max 6)
 let timerMax     = 60;
 let revealedRows = 0;          // how many grid rows have been revealed
+let roomOwnerId  = null;
 
 // Key state: best tile result per letter seen across revealed rows
 const keyStates = {};          // letter → 'correct' | 'present' | 'absent'
@@ -471,20 +472,14 @@ function renderGameOver(won, secretWord, scores, winner) {
 
   overlayGameOver.classList.remove('hidden');
 
-  let secs = 15;
-  gameOverCountdown.textContent = `Returning to lobby in ${secs}s…`;
-  const iv = setInterval(() => {
-    secs--;
-    if (secs <= 0) clearInterval(iv);
-    else gameOverCountdown.textContent = `Returning to lobby in ${secs}s…`;
-  }, 1000);
+  const amOwner = myId === roomOwnerId;
+  btnPlayAgain.style.display    = amOwner ? '' : 'none';
+  gameOverCountdown.textContent = amOwner ? '' : 'Waiting for host to start a new game…';
 }
 
 btnPlayAgain.addEventListener('click', () => {
-  overlayGameOver.classList.add('hidden');
-  socket.emit('fw:leave');
-  showScreen('lobby');
-  resetLobby();
+  socket.emit('fw:reset', myRoomId);
+  // fw:reset from server moves everyone back to the waiting screen
 });
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
@@ -507,15 +502,16 @@ function resetLobby() {
 socket.on('connect', () => { myId = socket.id; });
 
 socket.on('fw:joined', ({ roomId, playerId, room }) => {
-  myId     = playerId;
-  myRoomId = roomId;
-  timerMax = room.timePerRound;
+  myId        = playerId;
+  myRoomId    = roomId;
+  roomOwnerId = room.owner;
+  timerMax    = room.timePerRound;
   renderWaiting(room);
   showScreen('waiting');
 });
 
 socket.on('fw:playerJoined', ({ room }) => { renderWaiting(room); SFX.join(); });
-socket.on('fw:playerLeft',   ({ room }) => { renderWaiting(room); SFX.leave(); });
+socket.on('fw:playerLeft',   ({ room }) => { roomOwnerId = room.owner; renderWaiting(room); SFX.leave(); });
 
 socket.on('fw:started', ({ room }) => {
   SFX.gameStart();
@@ -587,8 +583,9 @@ socket.on('fw:gameOver', ({ won, secretWord, scores, winner }) => {
 
 socket.on('fw:reset', ({ room }) => {
   overlayGameOver.classList.add('hidden');
-  timerMax = room.timePerRound;
-  myRoomId = room.id;
+  myRoomId    = room.id;
+  roomOwnerId = room.owner;
+  timerMax    = room.timePerRound;
   renderWaiting(room);
   showScreen('waiting');
 });

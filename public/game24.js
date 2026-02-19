@@ -3,11 +3,12 @@
 const socket = io();
 
 // ── State ──────────────────────────────────────────────────────────────────
-let myId       = null;
-let myRoomId   = null;
-let myUsername = '';
-let timerMax   = 60;
-let currentNums = [];
+let myId         = null;
+let myRoomId     = null;
+let myUsername   = '';
+let timerMax     = 60;
+let currentNums  = [];
+let roomOwnerId  = null;
 
 // ── Screens ────────────────────────────────────────────────────────────────
 const screens = {
@@ -400,10 +401,8 @@ function enableInput() {
 
 // ── Play again ────────────────────────────────────────────────────────────────
 btnPlayAgain.addEventListener('click', () => {
-  overlayGameOver.classList.add('hidden');
-  socket.emit('g24:leave');
-  showScreen('lobby');
-  resetLobby();
+  socket.emit('g24:reset', myRoomId);
+  // g24:reset from server moves everyone back to the waiting screen
 });
 
 // ── Socket handlers ───────────────────────────────────────────────────────────
@@ -413,6 +412,7 @@ socket.on('connect', () => { myId = socket.id; });
 socket.on('g24:joined', ({ roomId, playerId, room }) => {
   myId = playerId;
   myRoomId = roomId;
+  roomOwnerId = room.owner;
   timerMax = room.timePerRound;
   renderWaiting(room);
   showScreen('waiting');
@@ -424,6 +424,7 @@ socket.on('g24:playerJoined', ({ room }) => {
 });
 
 socket.on('g24:playerLeft', ({ room }) => {
+  roomOwnerId = room.owner;
   renderWaiting(room);
   SFX.leave();
 });
@@ -518,24 +519,17 @@ socket.on('g24:gameOver', ({ scores, winner }) => {
   renderOverlayScores(gameOverScores, scores);
   overlayGameOver.classList.remove('hidden');
 
-  let secs = 20;
-  gameOverCountdown.textContent = `Auto-returning to lobby in ${secs}s…`;
-  const interval = setInterval(() => {
-    secs--;
-    if (secs <= 0) {
-      clearInterval(interval);
-      gameOverCountdown.textContent = '';
-    } else {
-      gameOverCountdown.textContent = `Auto-returning to lobby in ${secs}s…`;
-    }
-  }, 1000);
+  const amOwner = myId === roomOwnerId;
+  btnPlayAgain.style.display    = amOwner ? '' : 'none';
+  gameOverCountdown.textContent = amOwner ? '' : 'Waiting for host to start a new game…';
 });
 
 socket.on('g24:reset', ({ room }) => {
   overlayGameOver.classList.add('hidden');
   overlayRoundEnd.classList.add('hidden');
-  myRoomId = room.id;
-  timerMax = room.timePerRound;
+  myRoomId    = room.id;
+  roomOwnerId = room.owner;
+  timerMax    = room.timePerRound;
   renderWaiting(room);
   showScreen('waiting');
 });

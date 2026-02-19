@@ -3,11 +3,12 @@
 const socket = io();
 
 // ── State ──────────────────────────────────────────────────────────────────
-let myId       = null;
-let myRoomId   = null;
-let myUsername = '';
-let gameState  = { timePerTurn: 12, activePlayerId: null };
-let timerMax   = 12;
+let myId        = null;
+let myRoomId    = null;
+let myUsername  = '';
+let gameState   = { timePerTurn: 12, activePlayerId: null };
+let timerMax    = 12;
+let roomOwnerId = null;
 
 // ── Screens ────────────────────────────────────────────────────────────────
 const screens = {
@@ -274,10 +275,8 @@ wbInput.addEventListener('keydown', e => {
 
 // ── Play Again ──────────────────────────────────────────────────────────────
 btnPlayAgain.addEventListener('click', () => {
-  overlayGame.classList.add('hidden');
-  showScreen('lobby');
-  resetLobby();
-  socket.emit('wb:leave');
+  socket.emit('wb:reset', myRoomId);
+  // wb:reset from server moves everyone back to the waiting screen
 });
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -304,10 +303,11 @@ socket.on('connect', () => {
 });
 
 socket.on('wb:joined', ({ roomId, playerId, room }) => {
-  myId = playerId;
-  myRoomId = roomId;
+  myId        = playerId;
+  myRoomId    = roomId;
+  roomOwnerId = room.owner;
   gameState.timePerTurn = room.timePerTurn;
-  timerMax = room.timePerTurn;
+  timerMax    = room.timePerTurn;
   renderWaiting(room);
   showScreen('waiting');
 });
@@ -318,6 +318,7 @@ socket.on('wb:playerJoined', ({ room }) => {
 });
 
 socket.on('wb:playerLeft', ({ room }) => {
+  roomOwnerId = room.owner;
   renderWaiting(room);
   SFX.leave();
 });
@@ -422,25 +423,18 @@ socket.on('wb:ended', ({ scores, winner }) => {
   renderOverlayScores(gameScores, scores);
   overlayGame.classList.remove('hidden');
 
-  // Countdown to auto-reset
-  let secs = 15;
-  gameCountdown.textContent = `Returning to lobby in ${secs}s…`;
-  const countdownInterval = setInterval(() => {
-    secs--;
-    if (secs <= 0) {
-      clearInterval(countdownInterval);
-    } else {
-      gameCountdown.textContent = `Returning to lobby in ${secs}s…`;
-    }
-  }, 1000);
+  const amOwner = myId === roomOwnerId;
+  btnPlayAgain.style.display = amOwner ? '' : 'none';
+  gameCountdown.textContent  = amOwner ? '' : 'Waiting for host to start a new game…';
 });
 
 socket.on('wb:reset', ({ room }) => {
   overlayGame.classList.add('hidden');
   overlayRound.classList.add('hidden');
-  myRoomId = room.id;
+  myRoomId    = room.id;
+  roomOwnerId = room.owner;
   gameState.timePerTurn = room.timePerTurn;
-  timerMax = room.timePerTurn;
+  timerMax    = room.timePerTurn;
   renderWaiting(room);
   showScreen('waiting');
 });

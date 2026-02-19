@@ -100,18 +100,19 @@ class WordleManager {
     const player = { id: socket.id, name: username.slice(0, 20).trim() || 'Player', score: 0 };
 
     const room = {
-      id:           roomId,
-      owner:        socket.id,
-      players:      new Map([[socket.id, player]]),
-      state:        'lobby',
-      secretWord:   '',
-      maxGuesses:   6,
-      timePerRound: Math.max(30, Math.min(timePerRound, 120)),
-      currentGuess: 0,
-      guessHistory: [],       // [{ word, tiles, playerId, playerName, points }]
-      submissions:  new Map(),// socketId → { word, submittedAt }
-      timer:        null,
-      timeLeft:     0,
+      id:              roomId,
+      owner:           socket.id,
+      players:         new Map([[socket.id, player]]),
+      state:           'lobby',
+      secretWord:      '',
+      maxGuesses:      6,
+      timePerRound:    Math.max(30, Math.min(timePerRound, 120)),
+      currentGuess:    0,
+      guessHistory:    [],       // [{ word, tiles, playerId, playerName, points }]
+      submissions:     new Map(),// socketId → { word, submittedAt }
+      timer:           null,
+      timeLeft:        0,
+      autoResetTimer:  null,
     };
 
     this.rooms.set(roomId, room);
@@ -449,16 +450,28 @@ class WordleManager {
     console.log(`[wordle] Game over in ${room.id}. Won: ${won}, word: ${room.secretWord}`);
 
     // Auto-reset to lobby after 15s
-    setTimeout(() => {
+    room.autoResetTimer = setTimeout(() => {
       if (!this.rooms.has(room.id)) return;
-      room.state        = 'lobby';
-      room.secretWord   = '';
-      room.currentGuess = 0;
-      room.guessHistory = [];
-      room.submissions  = new Map();
-      for (const p of room.players.values()) p.score = 0;
-      this.io.to(room.id).emit('fw:reset', { room: this._roomPublic(room) });
+      this._doReset(room);
     }, 15000);
+  }
+
+  _doReset(room) {
+    if (room.autoResetTimer) { clearTimeout(room.autoResetTimer); room.autoResetTimer = null; }
+    room.state        = 'lobby';
+    room.secretWord   = '';
+    room.currentGuess = 0;
+    room.guessHistory = [];
+    room.submissions  = new Map();
+    for (const p of room.players.values()) p.score = 0;
+    this.io.to(room.id).emit('fw:reset', { room: this._roomPublic(room) });
+  }
+
+  resetRoom(socket, roomId) {
+    const room = this.rooms.get(roomId);
+    if (!room) { socket.emit('fw:error', { message: 'Room not found' }); return; }
+    if (room.owner !== socket.id) { socket.emit('fw:error', { message: 'Only the host can reset' }); return; }
+    this._doReset(room);
   }
 }
 
