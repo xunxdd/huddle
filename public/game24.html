@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The 24 Game 🔢 — Cat in a Cradle</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <script>
+    const _c = document.createElement('canvas'); _c.width = _c.height = 64;
+    const _x = _c.getContext('2d'); _x.font = '52px serif'; _x.textAlign = 'center'; _x.textBaseline = 'middle';
+    _x.fillText('🐱', 32, 36);
+    const _l = document.createElement('link'); _l.rel = 'shortcut icon'; _l.href = _c.toDataURL(); document.head.appendChild(_l);
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    body { overflow: auto; }
+
+    /* ── Shared ── */
+    .g24-title {
+      font-size: 2rem;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      text-align: center;
+      margin-bottom: 0.25rem;
+    }
+    .g24-tagline { text-align: center; color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.9rem; }
+
+    /* ── Lobby ── */
+    #screen-lobby .lobby-card { max-height: 90vh; overflow-y: auto; }
+
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+    .tab-btn {
+      flex: 1; padding: 0.5rem;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: transparent; color: var(--text-dim);
+      font-weight: 600; font-size: 0.9rem; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .settings-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0.75rem; margin-bottom: 1rem;
+    }
+
+    /* ── Waiting room ── */
+    #screen-waiting .lobby-card { width: 520px; }
+
+    .room-code-display { text-align: center; margin: 1rem 0; }
+    .room-code-display .code {
+      font-size: 2.5rem; font-weight: 900;
+      letter-spacing: 0.15em; color: var(--accent); font-family: monospace;
+    }
+    .code-label { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    .player-list { margin: 1rem 0; }
+    .player-list-title {
+      font-size: 0.7rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--text-dim); margin-bottom: 0.5rem;
+    }
+    .player-list-items { display: flex; flex-direction: column; gap: 0.4rem; }
+    .player-item {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--surface2); border-radius: 8px; font-size: 0.9rem;
+    }
+    .player-avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .player-crown { font-size: 0.9rem; margin-left: auto; }
+
+    /* ── Game screen ── */
+    #screen-game {
+      width: 100vw; min-height: 100vh;
+      display: flex; flex-direction: column; align-items: stretch; padding: 0;
+    }
+    #screen-game.hidden { display: none !important; }
+
+    /* Top bar */
+    .g24-topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem; flex-shrink: 0;
+    }
+    .g24-round-info { font-size: 0.85rem; color: var(--text-dim); display: flex; align-items: center; gap: 1rem; }
+    .g24-round-info strong { color: var(--text); }
+
+    /* Timer */
+    .g24-timer-wrap { position: relative; width: 52px; height: 52px; }
+    .g24-timer-svg { width: 52px; height: 52px; transform: rotate(-90deg); }
+    .g24-timer-track { fill: none; stroke: var(--border); stroke-width: 4; }
+    .g24-timer-arc {
+      fill: none; stroke: var(--green); stroke-width: 4; stroke-linecap: round;
+      transition: stroke-dashoffset 0.9s linear, stroke 0.3s;
+    }
+    .g24-timer-num {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; font-weight: 800;
+    }
+
+    /* Main layout */
+    .g24-main {
+      display: grid; grid-template-columns: 1fr 280px;
+      gap: 0; flex: 1; min-height: 0;
+    }
+
+    /* Center panel */
+    .g24-center {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 2rem; gap: 1.25rem;
+    }
+
+    /* Number cards */
+    .g24-cards {
+      display: flex; gap: 1rem; justify-content: center;
+    }
+    .g24-card {
+      width: 72px; height: 72px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; font-weight: 900;
+      cursor: pointer; transition: transform 0.1s, box-shadow 0.15s;
+      border: 2px solid transparent; user-select: none;
+    }
+    .g24-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+    .g24-card:active { transform: translateY(0); }
+    .g24-card.color-0 { background: rgba(233,69,96,0.18); border-color: rgba(233,69,96,0.4); color: #e94560; }
+    .g24-card.color-1 { background: rgba(96,165,250,0.18); border-color: rgba(96,165,250,0.4); color: #60a5fa; }
+    .g24-card.color-2 { background: rgba(74,222,128,0.18); border-color: rgba(74,222,128,0.4); color: #4ade80; }
+    .g24-card.color-3 { background: rgba(167,139,250,0.18); border-color: rgba(167,139,250,0.4); color: #a78bfa; }
+
+    /* Expression input */
+    .g24-expr-wrap {
+      width: 100%; max-width: 480px;
+      background: var(--surface2); border: 2px solid var(--border);
+      border-radius: 12px; padding: 0.75rem 1rem;
+      transition: border-color 0.15s;
+    }
+    .g24-expr-wrap.valid { border-color: var(--green); }
+    .g24-expr-wrap.invalid { border-color: var(--accent); }
+
+    .g24-expr-input {
+      width: 100%; background: transparent; border: none; outline: none;
+      color: var(--text); font-size: 1.2rem; font-weight: 600; font-family: monospace;
+    }
+    .g24-expr-result {
+      font-size: 0.8rem; margin-top: 0.3rem; color: var(--text-dim); min-height: 1.1rem;
+    }
+    .g24-expr-result.ok { color: var(--green); }
+    .g24-expr-result.err { color: var(--accent); }
+
+    /* Operator buttons */
+    .g24-ops {
+      display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: center;
+      max-width: 480px; width: 100%;
+    }
+    .g24-op-btn {
+      padding: 0.45rem 0.9rem; border-radius: 8px;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); font-size: 1rem; font-weight: 700;
+      cursor: pointer; transition: background 0.12s, border-color 0.12s;
+      font-family: monospace;
+    }
+    .g24-op-btn:hover { background: var(--surface); border-color: var(--accent); color: var(--accent); }
+
+    .g24-submit-btn {
+      width: 100%; max-width: 480px;
+      padding: 0.75rem; border-radius: 10px;
+      background: var(--accent); color: #fff; border: none;
+      font-size: 1rem; font-weight: 700; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .g24-submit-btn:hover:not(:disabled) { background: #c73652; }
+    .g24-submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .g24-feedback {
+      height: 1.4rem; font-size: 0.9rem; font-weight: 600; text-align: center;
+    }
+    .g24-feedback.ok { color: var(--green); }
+    .g24-feedback.err { color: var(--accent); }
+
+    /* Sidebar */
+    .g24-sidebar {
+      border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow-y: auto;
+    }
+    .g24-sidebar-section {
+      padding: 1rem; border-bottom: 1px solid var(--border);
+    }
+    .g24-sidebar-title {
+      font-size: 0.65rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.09em;
+      color: var(--text-dim); margin-bottom: 0.6rem;
+    }
+
+    .score-list { display: flex; flex-direction: column; gap: 0.35rem; }
+    .score-item {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.85rem; padding: 0.3rem 0; border-radius: 6px;
+    }
+    .score-rank { width: 18px; font-size: 0.75rem; color: var(--text-dim); text-align: center; }
+    .score-name { flex: 1; font-weight: 600; }
+    .score-pts { font-weight: 700; color: var(--yellow); font-size: 0.8rem; }
+    .score-item.winner-flash .score-name { color: var(--green); }
+    .score-item.is-me .score-name::after { content: ' (you)'; color: var(--text-dim); font-weight: 400; }
+
+    .recap-area { padding: 1rem; font-size: 0.82rem; }
+    .recap-title { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-dim); margin-bottom: 0.5rem; }
+    .recap-winner { color: var(--green); font-weight: 700; margin-bottom: 0.3rem; }
+    .recap-expr { font-family: monospace; color: var(--text); margin-bottom: 0.4rem; word-break: break-all; }
+    .recap-solution { color: var(--text-dim); }
+    .recap-solution span { color: var(--yellow); font-family: monospace; }
+
+    /* Overlays */
+    .g24-overlay {
+      position: fixed; inset: 0;
+      background: rgba(15,15,26,0.85);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100;
+    }
+    .g24-overlay.hidden { display: none !important; }
+
+    .g24-overlay-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 2rem 2.5rem;
+      min-width: 320px; max-width: 480px;
+      text-align: center; box-shadow: var(--shadow);
+    }
+    .g24-overlay-title { font-size: 1.5rem; font-weight: 900; margin-bottom: 1rem; }
+    .g24-overlay-scores { margin: 1rem 0; text-align: left; }
+    .overlay-score-row {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.4rem 0; border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+    .overlay-score-row:last-child { border-bottom: none; }
+    .overlay-rank { width: 22px; text-align: center; color: var(--text-dim); font-size: 0.8rem; }
+    .overlay-name { flex: 1; font-weight: 600; }
+    .overlay-pts { font-weight: 700; color: var(--yellow); }
+
+    .btn {
+      display: inline-block; padding: 0.6rem 1.5rem;
+      border-radius: 10px; font-size: 0.95rem; font-weight: 700;
+      cursor: pointer; border: none; transition: background 0.15s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #c73652; }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-full { width: 100%; margin-top: 0.5rem; padding: 0.7rem; }
+
+    .back-link {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      color: var(--text-dim); text-decoration: none; font-size: 0.85rem;
+      margin-bottom: 1rem; transition: color 0.15s;
+    }
+    .back-link:hover { color: var(--text); }
+
+    .copy-btn {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text-dim); padding: 0.35rem 0.75rem;
+      border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.15s;
+    }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    @media (max-width: 640px) {
+      .g24-main { grid-template-columns: 1fr; }
+      .g24-sidebar { border-left: none; border-top: 1px solid var(--border); max-height: 240px; }
+      .settings-grid { grid-template-columns: 1fr; }
+      .g24-card { width: 60px; height: 60px; font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Lobby ──────────────────────────────────────────────── -->
+  <div id="screen-lobby" class="screen">
+    <div class="lobby-card">
+      <a href="/" class="back-link">← Back to Home</a>
+      <div class="g24-title">🔢 The 24 Game</div>
+      <p class="g24-tagline">Race to make 24 from 4 numbers — first correct answer wins!</p>
+
+      <!-- Direct-join panel (via invite link) -->
+      <div id="lobby-direct-join" class="hidden">
+        <p style="color:var(--text-dim);font-size:0.9rem;margin-bottom:1rem;text-align:center">You've been invited! Enter your name to jump in.</p>
+        <div class="input-group">
+          <label class="input-label">Your name</label>
+          <input id="inp-username-direct" class="input-field" type="text" placeholder="Enter your name" maxlength="20" autocomplete="off" />
+        </div>
+        <button id="btn-direct-join" class="btn btn-primary btn-full">Join Game →</button>
+        <p style="text-align:center;margin-top:0.75rem">
+          <button id="btn-back-to-lobby" style="background:none;border:none;color:var(--text-dim);font-size:0.85rem;cursor:pointer">← Back to lobby</button>
+        </p>
+      </div>
+
+      <div id="lobby-username-step">
+        <div class="input-group">
+          <label class="input-label">Your name</label>
+          <input id="inp-username" class="input-field" type="text" placeholder="Enter your name" maxlength="20" autocomplete="off" />
+        </div>
+        <button id="btn-continue" class="btn btn-primary btn-full">Continue →</button>
+      </div>
+
+      <div id="lobby-choice-step" class="hidden">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="create">Create Room</button>
+          <button class="tab-btn" data-tab="join">Join Room</button>
+        </div>
+
+        <!-- Create tab -->
+        <div id="tab-create" class="tab-panel active">
+          <div class="settings-grid">
+            <div class="input-group">
+              <label class="input-label">Rounds</label>
+              <select id="inp-rounds" class="input-field">
+                <option value="3">3 rounds</option>
+                <option value="5" selected>5 rounds</option>
+                <option value="7">7 rounds</option>
+                <option value="10">10 rounds</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label class="input-label">Time per round</label>
+              <select id="inp-time" class="input-field">
+                <option value="30">30 seconds</option>
+                <option value="45">45 seconds</option>
+                <option value="60" selected>60 seconds</option>
+                <option value="90">90 seconds</option>
+              </select>
+            </div>
+          </div>
+          <button id="btn-create" class="btn btn-primary btn-full">Create Room</button>
+        </div>
+
+        <!-- Join tab -->
+        <div id="tab-join" class="tab-panel">
+          <div class="input-group">
+            <label class="input-label">Room code</label>
+            <input id="inp-room-code" class="input-field" type="text" placeholder="e.g. ABCD23" maxlength="6"
+              autocomplete="off" style="text-transform:uppercase;letter-spacing:0.1em" />
+          </div>
+          <button id="btn-join" class="btn btn-primary btn-full">Join Room</button>
+        </div>
+      </div>
+
+      <p id="lobby-error" class="hidden" style="color:var(--accent);font-size:0.85rem;margin-top:0.75rem;text-align:center"></p>
+    </div>
+  </div>
+
+  <!-- ── Waiting Room ───────────────────────────────────────── -->
+  <div id="screen-waiting" class="screen hidden">
+    <div class="lobby-card" style="width:520px">
+      <a href="/" class="back-link" id="waiting-back-link">← Leave room</a>
+      <div class="g24-title">🔢 The 24 Game</div>
+      <div class="room-code-display">
+        <div class="code-label">Room Code</div>
+        <div class="code" id="waiting-room-code">------</div>
+        <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:0.4rem">
+          <button class="copy-btn" id="btn-copy-code">Copy Code</button>
+          <button class="copy-btn" id="btn-copy-link">🔗 Invite Link</button>
+        </div>
+        <p id="link-copied-msg" class="hidden" style="font-size:0.75rem;color:var(--green);margin-top:0.3rem">Link copied!</p>
+      </div>
+
+      <div class="player-list">
+        <div class="player-list-title">Players (<span id="waiting-player-count">0</span>)</div>
+        <div class="player-list-items" id="waiting-players"></div>
+      </div>
+
+      <p id="waiting-hint" style="font-size:0.8rem;color:var(--text-dim);text-align:center;margin-bottom:0.75rem">
+        Share the room code with friends!
+      </p>
+
+      <button id="btn-start" class="btn btn-primary btn-full hidden">Start Game</button>
+      <p id="waiting-not-owner" class="hidden" style="text-align:center;color:var(--text-dim);font-size:0.85rem">
+        Waiting for the host to start…
+      </p>
+    </div>
+  </div>
+
+  <!-- ── Game Screen ────────────────────────────────────────── -->
+  <div id="screen-game" class="hidden" style="display:none">
+
+    <!-- Top bar -->
+    <div class="g24-topbar">
+      <div class="g24-round-info">
+        <a href="/" style="color:var(--text-dim);text-decoration:none;font-size:0.85rem;transition:color 0.15s"
+           onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-dim)'">⌂ Home</a>
+        <span>Round <strong id="hud-round">1</strong> / <span id="hud-total-rounds">5</span></span>
+      </div>
+      <div style="font-size:1.1rem;font-weight:900;letter-spacing:-0.01em">🔢 The 24 Game</div>
+      <div style="display:flex;align-items:center;gap:0.75rem">
+        <div class="g24-timer-wrap">
+          <svg class="g24-timer-svg" viewBox="0 0 52 52">
+            <circle class="g24-timer-track" cx="26" cy="26" r="22"/>
+            <circle class="g24-timer-arc" id="timer-arc" cx="26" cy="26" r="22"
+              stroke-dasharray="138.2" stroke-dashoffset="0"/>
+          </svg>
+          <div class="g24-timer-num" id="hud-timer">60</div>
+        </div>
+        <span id="mute-btn-anchor"></span>
+      </div>
+    </div>
+
+    <!-- Main layout -->
+    <div class="g24-main">
+
+      <!-- Center panel -->
+      <div class="g24-center">
+        <p style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim)">
+          Make 24 using all four numbers
+        </p>
+
+        <!-- Number cards -->
+        <div class="g24-cards" id="g24-cards"></div>
+
+        <!-- Expression input -->
+        <div class="g24-expr-wrap" id="g24-expr-wrap">
+          <input id="g24-expr-input" class="g24-expr-input"
+            type="text" placeholder="e.g. (3+8-4)*2" autocomplete="off" spellcheck="false" />
+          <div class="g24-expr-result" id="g24-expr-result"></div>
+        </div>
+
+        <!-- Operator buttons -->
+        <div class="g24-ops">
+          <button class="g24-op-btn" data-insert="+">+</button>
+          <button class="g24-op-btn" data-insert="-">−</button>
+          <button class="g24-op-btn" data-insert="*">×</button>
+          <button class="g24-op-btn" data-insert="/">/</button>
+          <button class="g24-op-btn" data-insert="(">(</button>
+          <button class="g24-op-btn" data-insert=")">)</button>
+          <button class="g24-op-btn" id="op-del">⌫</button>
+          <button class="g24-op-btn" id="op-clear">C</button>
+        </div>
+
+        <button id="g24-submit-btn" class="g24-submit-btn" disabled>Submit</button>
+        <div class="g24-feedback" id="g24-feedback"></div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="g24-sidebar">
+        <div class="g24-sidebar-section">
+          <div class="g24-sidebar-title">Scores</div>
+          <div class="score-list" id="score-list"></div>
+        </div>
+        <div class="recap-area" id="recap-area" style="display:none">
+          <div class="recap-title">Last Round</div>
+          <div id="recap-content"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Round End Overlay ──────────────────────────────────── -->
+  <div id="overlay-round-end" class="g24-overlay hidden">
+    <div class="g24-overlay-card">
+      <div class="g24-overlay-title" id="round-end-title">Round Complete!</div>
+      <div id="round-end-body" style="margin-bottom:1rem;font-size:0.9rem;color:var(--text-dim)"></div>
+      <div class="g24-overlay-scores" id="round-end-scores"></div>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-top:0.75rem" id="round-end-next"></p>
+    </div>
+  </div>
+
+  <!-- ── Game Over Overlay ──────────────────────────────────── -->
+  <div id="overlay-game-over" class="g24-overlay hidden">
+    <div class="g24-overlay-card">
+      <div style="font-size:2.5rem;margin-bottom:0.5rem">🏆</div>
+      <div class="g24-overlay-title" id="game-over-title">Game Over!</div>
+      <div class="g24-overlay-scores" id="game-over-scores"></div>
+      <div style="margin-top:1.25rem;display:flex;gap:0.75rem;justify-content:center">
+        <button id="btn-play-again" class="btn btn-primary">Play Again</button>
+        <a href="/" class="btn btn-secondary">Home</a>
+      </div>
+      <p style="color:var(--text-dim);font-size:0.8rem;margin-top:0.75rem" id="game-over-countdown"></p>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/sounds.js"></script>
+  <script src="/game24.js"></script>
+  <script>mountMuteBtn(document.getElementById('mute-btn-anchor'));</script>
+</body>
+</html>

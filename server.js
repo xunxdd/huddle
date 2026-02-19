@@ -5,6 +5,7 @@ const path = require('path');
 const GameManager = require('./src/gameManager');
 const WordBombManager = require('./src/wordBombManager');
 const WordleManager = require('./src/wordleManager');
+const Game24Manager = require('./src/game24Manager');
 
 const app = express();
 const server = http.createServer(app);
@@ -38,11 +39,20 @@ app.get('/wordle/join/:code', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'wordle.html'));
 });
 
+// The 24 Game page + invite links
+app.get('/game24', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'game24.html'));
+});
+app.get('/game24/join/:code', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'game24.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const gm  = new GameManager(io);
 const wbm = new WordBombManager(io);
 const wm  = new WordleManager(io);
+const g24 = new Game24Manager(io);
 
 io.on('connection', (socket) => {
   console.log(`+ connected: ${socket.id}`);
@@ -113,11 +123,19 @@ io.on('connection', (socket) => {
   socket.on('fw:start',       id => wm.startGame(socket, id));
   socket.on('fw:submitGuess', d  => wm.handleSubmitGuess(socket, d || {}));
 
+  // ── The 24 Game ───────────────────────────────────────────────────────────
+  socket.on('g24:create', d  => g24.createRoom(socket, d || {}));
+  socket.on('g24:join',   d  => g24.joinRoom(socket, d || {}));
+  socket.on('g24:leave',  () => g24.leaveRoom(socket));
+  socket.on('g24:start',  id => g24.startGame(socket, id));
+  socket.on('g24:submit', d  => g24.handleSubmit(socket, d || {}));
+
   socket.on('disconnect', () => {
     console.log(`- disconnected: ${socket.id}`);
     gm.leaveRoom(socket);
     wbm.leaveRoom(socket);
     wm.leaveRoom(socket);
+    g24.leaveRoom(socket);
   });
 });
 
