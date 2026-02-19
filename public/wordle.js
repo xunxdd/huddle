@@ -54,6 +54,7 @@ const hudTimer         = document.getElementById('hud-timer');
 const fwGrid           = document.getElementById('fw-grid');
 const fwFeedback       = document.getElementById('fw-feedback');
 const fwPlayersList    = document.getElementById('fw-players-list');
+const fwPlayerStrip    = document.getElementById('fw-player-strip');
 const fwRecap          = document.getElementById('fw-recap');
 const fwHiddenInput    = document.getElementById('fw-hidden-input');
 const overlayGameOver  = document.getElementById('overlay-game-over');
@@ -351,17 +352,33 @@ function submitGuess(word) {
 // ── Sidebar: players ──────────────────────────────────────────────────────────
 function renderPlayers(scores, submittedIds = new Set()) {
   fwPlayersList.innerHTML = '';
+  fwPlayerStrip.innerHTML = '';
   for (const p of scores) {
+    const submitted = submittedIds.has(p.id);
+    const isMe = p.id === myId;
+
+    // Sidebar row
     const div = document.createElement('div');
-    div.className = 'fw-player-row' + (p.id === myId ? ' is-me' : '');
+    div.className = 'fw-player-row' + (isMe ? ' is-me' : '');
     div.id = `fw-player-${p.id}`;
-    const badge = submittedIds.has(p.id) ? '<span class="fw-submitted-badge" title="Submitted">✓</span>' : '<span class="fw-submitted-badge" style="opacity:0">✓</span>';
     div.innerHTML = `
       <span class="fw-player-name">${escHtml(p.name)}</span>
-      ${badge}
+      <span class="fw-submitted-badge" style="opacity:${submitted ? 1 : 0}">✓</span>
       <span class="fw-player-score">${p.score}</span>
     `;
     fwPlayersList.appendChild(div);
+
+    // Mobile strip chip
+    const chip = document.createElement('div');
+    chip.className = 'fw-strip-chip' + (isMe ? ' is-me' : '') + (submitted ? ' submitted' : '');
+    chip.dataset.playerId = p.id;
+    chip.innerHTML = `
+      <span class="fw-strip-avatar">${escHtml(p.name[0].toUpperCase())}</span>
+      <span class="fw-strip-name">${escHtml(p.name)}${isMe ? ' (you)' : ''}</span>
+      <span class="fw-strip-score">${p.score}</span>
+      <span class="fw-strip-check">✓</span>
+    `;
+    fwPlayerStrip.appendChild(chip);
   }
 }
 
@@ -550,12 +567,15 @@ socket.on('fw:playerSubmitted', ({ playerId }) => {
     showFeedback('Submitted! Waiting for others…', 'ok');
     SFX.submit();
   }
-  // Add ✓ badge to that player
+  // Add ✓ badge to sidebar row
   const row = document.getElementById(`fw-player-${playerId}`);
   if (row) {
     const badge = row.querySelector('.fw-submitted-badge');
     if (badge) badge.style.opacity = '1';
   }
+  // Add ✓ to mobile strip chip
+  const chip = fwPlayerStrip.querySelector(`[data-player-id="${playerId}"]`);
+  if (chip) chip.classList.add('submitted');
 });
 
 socket.on('fw:roundEnd', ({ guessNumber, bestWord, tiles, playerId, playerName, allSubmissions, pointsAwarded, scores, won }) => {

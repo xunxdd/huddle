@@ -223,11 +223,53 @@
     .back-link { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--text-dim); text-decoration: none; font-size: 0.85rem; margin-bottom: 1rem; transition: color 0.15s; }
     .back-link:hover { color: var(--text); }
 
+    /* ── Mobile player strip ── */
+    .fw-player-strip {
+      display: none; /* desktop: hidden — sidebar handles it */
+      flex-shrink: 0;
+      overflow-x: auto;
+      gap: 6px;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      /* hide scrollbar but keep scrollable */
+      scrollbar-width: none;
+    }
+    .fw-player-strip::-webkit-scrollbar { display: none; }
+
+    .fw-strip-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 10px 4px 4px;
+      white-space: nowrap;
+      transition: border-color 0.2s;
+      flex-shrink: 0;
+    }
+    .fw-strip-chip.is-me   { border-color: var(--accent); }
+    .fw-strip-chip.submitted { border-color: var(--green); }
+
+    .fw-strip-avatar {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--accent); color: #fff;
+      font-size: 0.72rem; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .fw-strip-name  { font-size: 0.78rem; font-weight: 600; max-width: 70px; overflow: hidden; text-overflow: ellipsis; }
+    .fw-strip-score { font-size: 0.75rem; font-weight: 700; color: var(--yellow); }
+    .fw-strip-check { font-size: 0.8rem; color: var(--green); opacity: 0; transition: opacity 0.2s; margin-left: 1px; }
+    .fw-strip-chip.submitted .fw-strip-check { opacity: 1; }
+
     /* Responsive */
     @media (max-width: 680px) {
-      /* Stack sidebar below */
+      /* Hide sidebar, show strip instead */
       .fw-main { grid-template-columns: 1fr; }
-      .fw-sidebar { border-left: none; border-top: 1px solid var(--border); max-height: 160px; }
+      .fw-sidebar { display: none; }
+      .fw-player-strip { display: flex; }
 
       /* Tighten center padding */
       .fw-center { padding: 0.75rem 0.5rem 0.5rem; gap: 0.5rem; }
@@ -350,6 +392,9 @@
         <span id="mute-btn-anchor"></span>
       </div>
     </div>
+
+    <!-- Mobile player strip (hidden on desktop, shown on mobile instead of sidebar) -->
+    <div class="fw-player-strip" id="fw-player-strip"></div>
 
     <!-- Main layout -->
     <div class="fw-main">
