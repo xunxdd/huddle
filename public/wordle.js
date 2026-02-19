@@ -514,10 +514,11 @@ socket.on('fw:joined', ({ roomId, playerId, room }) => {
   showScreen('waiting');
 });
 
-socket.on('fw:playerJoined', ({ room }) => { renderWaiting(room); });
-socket.on('fw:playerLeft',   ({ room }) => { renderWaiting(room); });
+socket.on('fw:playerJoined', ({ room }) => { renderWaiting(room); SFX.join(); });
+socket.on('fw:playerLeft',   ({ room }) => { renderWaiting(room); SFX.leave(); });
 
 socket.on('fw:started', ({ room }) => {
+  SFX.gameStart();
   timerMax = room.timePerRound;
   hudMaxGuesses.textContent = room.maxGuesses;
   overlayGameOver.classList.add('hidden');
@@ -528,6 +529,7 @@ socket.on('fw:started', ({ room }) => {
 
 socket.on('fw:roundStart', ({ guessNumber, maxGuesses, timeLeft, guessHistory, scores }) => {
   submitted = false;
+  SFX.turnStart();
   hudGuessNum.textContent  = guessNumber;
   hudMaxGuesses.textContent = maxGuesses;
   updateTimer(timeLeft);
@@ -542,6 +544,7 @@ socket.on('fw:roundStart', ({ guessNumber, maxGuesses, timeLeft, guessHistory, s
 
 socket.on('fw:tick', ({ timeLeft }) => {
   updateTimer(timeLeft);
+  if (timeLeft <= 10 && timeLeft > 0) SFX.tick();
 });
 
 socket.on('fw:playerSubmitted', ({ playerId }) => {
@@ -549,6 +552,7 @@ socket.on('fw:playerSubmitted', ({ playerId }) => {
   if (playerId === myId) {
     submitted = true;
     showFeedback('Submitted! Waiting for others…', 'ok');
+    SFX.submit();
   }
   // Add ✓ badge to that player
   const row = document.getElementById(`fw-player-${playerId}`);
@@ -560,19 +564,22 @@ socket.on('fw:playerSubmitted', ({ playerId }) => {
 
 socket.on('fw:roundEnd', ({ guessNumber, bestWord, tiles, playerId, playerName, allSubmissions, pointsAwarded, scores, won }) => {
   setInputEnabled(false, revealedRows);
+  SFX.reveal();
 
   const rowIndex = guessNumber - 1;
   animateRowReveal(rowIndex, bestWord, tiles, () => {
     revealedRows = guessNumber;
     renderPlayers(scores, new Set());
     renderRecap(bestWord, tiles, playerName, pointsAwarded, allSubmissions);
-    if (won) launchConfetti();
+    if (won) { SFX.correct(); launchConfetti(); }
+    else SFX.roundEnd();
   });
 
   hudGuessNum.textContent = guessNumber;
 });
 
 socket.on('fw:gameOver', ({ won, secretWord, scores, winner }) => {
+  if (won) SFX.win(); else SFX.lose();
   setTimeout(() => {
     renderGameOver(won, secretWord, scores, winner);
   }, won ? 1500 : 500);

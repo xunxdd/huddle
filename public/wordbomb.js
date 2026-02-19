@@ -314,13 +314,16 @@ socket.on('wb:joined', ({ roomId, playerId, room }) => {
 
 socket.on('wb:playerJoined', ({ room }) => {
   renderWaiting(room);
+  SFX.join();
 });
 
 socket.on('wb:playerLeft', ({ room }) => {
   renderWaiting(room);
+  SFX.leave();
 });
 
 socket.on('wb:started', ({ room }) => {
+  SFX.gameStart();
   gameState.timePerTurn = room.timePerTurn;
   timerMax = room.timePerTurn;
   hudTotalRounds.textContent = room.totalRounds;
@@ -331,6 +334,7 @@ socket.on('wb:started', ({ room }) => {
 });
 
 socket.on('wb:turnStart', ({ activePlayerId, activePlayerName, combo, timeLeft, round, totalRounds, scores }) => {
+  SFX.turnStart();
   gameState.activePlayerId = activePlayerId;
   const isMe = activePlayerId === myId;
 
@@ -360,11 +364,13 @@ socket.on('wb:turnStart', ({ activePlayerId, activePlayerName, combo, timeLeft, 
 
 socket.on('wb:tick', ({ timeLeft }) => {
   updateTimerArc(timeLeft, timerMax);
+  if (timeLeft <= 5 && timeLeft > 0) SFX.tick();
 });
 
 socket.on('wb:wordAccepted', ({ playerId, playerName, word, points, breakdown, scores }) => {
   const isMe = playerId === myId;
-  if (isMe) showFeedback(`+${points} pts!`, 'ok');
+  if (isMe) { showFeedback(`+${points} pts!`, 'ok'); SFX.correct(); }
+  else SFX.otherCorrect();
 
   addFeedItem(`
     <span class="feed-name">${escHtml(playerName)}</span>
@@ -395,7 +401,7 @@ socket.on('wb:turnEnd', ({ playerId, timedOut, scores }) => {
 
 socket.on('wb:roundEnd', ({ round, totalRounds, scores, isLastRound }) => {
   if (isLastRound) return; // game end overlay will show
-
+  SFX.roundEnd();
   roundTitle.textContent = `Round ${round} Complete!`;
   renderOverlayScores(roundScores, scores);
   roundNext.textContent = `Round ${round + 1} starting in 3 seconds…`;
@@ -407,6 +413,7 @@ socket.on('wb:ended', ({ scores, winner }) => {
 
   if (winner) {
     const isMe = winner.id === myId;
+    if (isMe) SFX.win(); else SFX.lose();
     gameWinner.textContent = isMe ? '🎉 You won!' : `🏆 ${winner.name} wins!`;
   } else {
     gameWinner.textContent = 'Game Over!';

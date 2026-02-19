@@ -539,13 +539,16 @@
         <span class="wb-bomb-icon">💣</span>
         <span id="hud-combo" style="font-size:1.3rem;font-family:monospace;color:var(--accent)">--</span>
       </div>
-      <div class="wb-timer-wrap">
-        <svg class="wb-timer-svg" viewBox="0 0 52 52">
-          <circle class="wb-timer-track" cx="26" cy="26" r="22"/>
-          <circle class="wb-timer-arc" id="timer-arc" cx="26" cy="26" r="22"
-            stroke-dasharray="138.2" stroke-dashoffset="0"/>
-        </svg>
-        <div class="wb-timer-num" id="hud-timer">12</div>
+      <div style="display:flex;align-items:center;gap:0.75rem">
+        <div class="wb-timer-wrap">
+          <svg class="wb-timer-svg" viewBox="0 0 52 52">
+            <circle class="wb-timer-track" cx="26" cy="26" r="22"/>
+            <circle class="wb-timer-arc" id="timer-arc" cx="26" cy="26" r="22"
+              stroke-dasharray="138.2" stroke-dashoffset="0"/>
+          </svg>
+          <div class="wb-timer-num" id="hud-timer">12</div>
+        </div>
+        <span id="mute-btn-anchor"></span>
       </div>
     </div>
 
@@ -606,6 +609,8 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/sounds.js"></script>
   <script src="/wordbomb.js"></script>
+  <script>mountMuteBtn(document.getElementById('mute-btn-anchor'));</script>
 </body>
 </html>

@@ -120,6 +120,7 @@ function initSocket() {
     State.room = room;
     renderWaitingRoom();
     addChatMsg({ type: 'system', message: `${player.name} joined the room.` });
+    SFX.join();
   });
 
   s.on('room:playerLeft', ({ playerId, playerName, newOwner, room }) => {
@@ -133,6 +134,7 @@ function initSocket() {
     } else if (currentScreen() === 'game') {
       renderPlayerList();
     }
+    SFX.leave();
   });
 
   s.on('room:error', ({ message }) => {
@@ -156,6 +158,7 @@ function initSocket() {
     clearChat();
     hideAllOverlays();
     renderPlayerList();
+    SFX.gameStart();
     document.getElementById('top-round').textContent = room.currentRound || 1;
     document.getElementById('top-totalrounds').textContent = room.totalRounds;
     const catMsg = selectedCategory && selectedCategory !== 'Mixed'
@@ -166,6 +169,7 @@ function initSocket() {
 
   s.on('game:turnStart', ({ drawer, drawerName, round, totalRounds, state }) => {
     _clearCanvasSync();
+    SFX.turnStart();
     State.isDrawer = drawer === State.playerId;
     State.hasGuessed = false;
     State.currentWord = null;
@@ -237,9 +241,11 @@ function initSocket() {
   s.on('game:timerTick', ({ timeLeft }) => {
     State.timeLeft = timeLeft;
     updateTimer(timeLeft, State.drawTime);
+    if (timeLeft <= 10 && timeLeft > 0) SFX.tick();
   });
 
   s.on('game:correctGuess', ({ playerId, playerName, points, totalScore, correctCount, totalGuessers }) => {
+    SFX.otherCorrect();
     addChatMsg({
       type: 'correct',
       message: `${playerName} guessed correctly! (+${points} pts)`,
@@ -261,11 +267,14 @@ function initSocket() {
     updateWordDisplay(word);
     setChatEnabled(false);
     addChatMsg({ type: 'correct', message: `You got it! The word was "${word}".` });
+    SFX.correct();
   });
 
   s.on('game:turnEnd', ({ word, drawer, drawerName, drawerPoints, correctGuessers, scores }) => {
     State.isDrawer = false;
     _clearCanvasSync();
+    SFX.roundEnd();
+    SFX.reveal();
     setDrawingEnabled(false);
     setToolbarVisible(false);
     setReactionBarVisible(false);
@@ -302,6 +311,8 @@ function initSocket() {
   s.on('game:ended', ({ scores, winner }) => {
     hideAllOverlays();
     showGameEndOverlay(scores, winner);
+    if (winner && winner.id === State.playerId) SFX.win();
+    else SFX.lose();
   });
 
   s.on('game:reset', ({ room, categoryVotes }) => {

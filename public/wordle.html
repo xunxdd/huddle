@@ -327,7 +327,10 @@
         <span>Guess <strong id="hud-guess-num">1</strong> / <span id="hud-max-guesses">6</span></span>
       </div>
       <div class="fw-topbar-center" style="display:flex;align-items:center;gap:0.4rem"><span class="fw-grid-icon sm"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span> Family Wordle</div>
-      <div class="fw-timer" id="hud-timer">⏱ 60</div>
+      <div style="display:flex;align-items:center;gap:0.75rem">
+        <div class="fw-timer" id="hud-timer">⏱ 60</div>
+        <span id="mute-btn-anchor"></span>
+      </div>
     </div>
 
     <!-- Main layout -->
@@ -415,6 +418,8 @@
   <div class="fw-confetti-overlay hidden" id="fw-confetti"></div>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/sounds.js"></script>
   <script src="/wordle.js"></script>
+  <script>mountMuteBtn(document.getElementById('mute-btn-anchor'));</script>
 </body>
 </html>
