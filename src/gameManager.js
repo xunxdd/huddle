@@ -104,20 +104,44 @@ class GameManager {
     }
 
     // Cancel pending disconnect timer for the same player (reconnecting)
+    let reconnectedAsDrawer = false;
     for (const [oldSocketId, pending] of this.disconnectTimers) {
       if (pending.roomId === code && pending.playerName === username) {
         clearTimeout(pending.timer);
         this.disconnectTimers.delete(oldSocketId);
-        // Clean up the old player entry
-        room.players.delete(oldSocketId);
+
+        // If reconnecting player was the drawer, update references to new socket
+        if (room.currentDrawer === oldSocketId) {
+          room.currentDrawer = socket.id;
+          const idx = room.drawerOrder.indexOf(oldSocketId);
+          if (idx !== -1) room.drawerOrder[idx] = socket.id;
+          reconnectedAsDrawer = true;
+          console.log(`${username} reconnected as drawer in room ${code}`);
+        }
+
+        // Preserve score from old player entry
+        const oldPlayer = room.players.get(oldSocketId);
+        if (oldPlayer) {
+          const newPlayer = this._makePlayer(socket.id, username);
+          newPlayer.score = oldPlayer.score;
+          newPlayer.roundScore = oldPlayer.roundScore;
+          newPlayer.hasGuessed = oldPlayer.hasGuessed;
+          room.players.delete(oldSocketId);
+          room.players.set(socket.id, newPlayer);
+        } else {
+          room.players.delete(oldSocketId);
+        }
         this.playerRooms.delete(oldSocketId);
         console.log(`${username} reconnected to room ${code}, cancelled disconnect timer`);
         break;
       }
     }
 
-    const player = this._makePlayer(socket.id, username);
-    room.players.set(socket.id, player);
+    // Only create a new player entry if we didn't already restore one above
+    if (!room.players.has(socket.id)) {
+      const player = this._makePlayer(socket.id, username);
+      room.players.set(socket.id, player);
+    }
     this.playerRooms.set(socket.id, code);
     socket.join(code);
 
@@ -135,6 +159,7 @@ class GameManager {
         wordDisplay: room.wordDisplay || '',
         wordLength: room.currentWord ? room.currentWord.length : 0,
         timeLeft: room.timeLeft,
+        yourWord: reconnectedAsDrawer ? room.currentWord : undefined,
       } : null,
     });
 

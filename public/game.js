@@ -121,23 +121,42 @@ function initSocket() {
     State.myVoteCategory = myVoteCategory || null;
 
     if (midGame) {
-      // Joining a game already in progress
+      const isReconnectingAsDrawer = midGame.currentDrawer === playerId && midGame.yourWord;
+
       State.hasGuessed = false;
-      State.currentWord = null;
-      State.isDrawer = false;
+      State.isDrawer = !!isReconnectingAsDrawer;
       showScreen('game');
-      clearCanvas();
-      clearChat();
       hideAllOverlays();
-      renderPlayerList();
       document.getElementById('top-round').textContent = room.currentRound || 1;
       document.getElementById('top-totalrounds').textContent = room.totalRounds;
-      updateWordDisplay(midGame.wordDisplay + (midGame.wordLength ? `  (${midGame.wordLength} letters)` : ''));
-      setDrawingEnabled(false);
-      setChatEnabled(true);
-      setReactionBarVisible(true);
       updateTimer(midGame.timeLeft, room.drawTime);
-      addChatMsg({ type: 'system', message: `${midGame.drawerName} is drawing!` });
+
+      if (isReconnectingAsDrawer) {
+        // Drawer reconnecting — preserve canvas, restore drawing state
+        State.currentWord = midGame.yourWord;
+        updateWordDisplay(midGame.yourWord);
+        setDrawingEnabled(true);
+        setToolbarVisible(true);
+        setChatEnabled(false);
+        setReactionBarVisible(false);
+        setCanvasOverlay('');
+        // Save current canvas as undo snapshot and restart sync
+        State.drawHistory = [];
+        saveDrawSnapshot();
+        _startCanvasSync();
+      } else {
+        // Guesser joining/reconnecting mid-game
+        State.currentWord = null;
+        clearCanvas();
+        clearChat();
+        updateWordDisplay(midGame.wordDisplay + (midGame.wordLength ? `  (${midGame.wordLength} letters)` : ''));
+        setDrawingEnabled(false);
+        setChatEnabled(true);
+        setReactionBarVisible(true);
+        addChatMsg({ type: 'system', message: `${midGame.drawerName} is drawing!` });
+      }
+
+      renderPlayerList();
     } else {
       showScreen('waiting');
       renderWaitingRoom();
