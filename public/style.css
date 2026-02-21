@@ -515,3 +515,138 @@ textarea { resize: vertical; font-family: inherit; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* ══════════════════════════════════════════════════════════
+   MOBILE PLAYER STRIP & CHAT (hidden on desktop)
+══════════════════════════════════════════════════════════ */
+.mobile-player-strip {
+  display: none;
+  flex-shrink: 0;
+  overflow-x: auto;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+}
+.mobile-player-strip::-webkit-scrollbar { display: none; }
+
+.mobile-strip-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  transition: border-color 0.2s;
+  flex-shrink: 0;
+}
+.mobile-strip-chip.is-drawer { border-color: var(--accent); }
+.mobile-strip-chip.has-guessed { border-color: var(--green); }
+
+.mobile-strip-rank { font-size: 0.65rem; color: var(--text-dim); }
+.mobile-strip-name { font-weight: 600; max-width: 70px; overflow: hidden; text-overflow: ellipsis; }
+.mobile-strip-score { font-weight: 700; color: var(--yellow); font-size: 0.7rem; }
+.mobile-strip-badge { font-size: 0.65rem; }
+
+.mobile-chat {
+  display: none;
+  flex-direction: column;
+  background: var(--surface2);
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+}
+
+/* ══════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — 680px breakpoint
+══════════════════════════════════════════════════════════ */
+@media (max-width: 680px) {
+  /* Game screen: vertical flex stack, no scroll — everything fits in viewport */
+  #game-screen {
+    overflow: hidden;
+  }
+
+  /* Top bar: tighter */
+  #game-topbar {
+    padding: 0.35rem 0.5rem;
+    height: 44px;
+    gap: 0.5rem;
+  }
+  #topbar-round { font-size: 0.75rem; min-width: auto; }
+  .word-display { font-size: 1rem; letter-spacing: 0.08em; }
+  .timer-ring { width: 30px; height: 30px; }
+  .timer-number { font-size: 0.85rem; }
+  #topbar-timer { min-width: auto; }
+
+  /* Show mobile player strip */
+  .mobile-player-strip { display: flex; }
+
+  /* Switch layout from 3-column grid to single column */
+  #game-layout {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+
+  /* Hide desktop sidebars */
+  #player-panel { display: none; }
+  #chat-panel { display: none; }
+
+  /* Canvas panel: full width, constrained height */
+  #canvas-panel {
+    padding: 0.25rem;
+    gap: 0.25rem;
+    flex: 0 0 auto;
+  }
+  #canvas-wrapper {
+    flex: 0 0 auto;
+    height: 45vh;
+    min-height: 180px;
+    max-height: 50vh;
+  }
+  #game-canvas {
+    border-radius: 2px;
+  }
+
+  /* Toolbar: compact, wrapping */
+  .toolbar {
+    padding: 0.3rem 0.4rem;
+    gap: 0.3rem;
+    border-radius: 6px;
+  }
+  .tool-btn { width: 30px; height: 30px; font-size: 0.9rem; }
+  .swatch { width: 18px; height: 18px; }
+  .color-palette { max-width: 160px; gap: 0.2rem; }
+  #color-picker { width: 30px; height: 30px; }
+  .size-btn { width: 30px; height: 30px; }
+  .tool-divider { height: 22px; }
+
+  /* Show mobile chat */
+  .mobile-chat {
+    display: flex;
+    flex: 1 1 0;
+    min-height: 120px;
+  }
+  .mobile-chat .chat-messages {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.4rem;
+  }
+  .mobile-chat .chat-input-row {
+    padding: 0.35rem 0.4rem;
+  }
+
+  /* Overlays: tighter on mobile */
+  .overlay-card {
+    padding: 1.5rem 1.25rem;
+    min-width: auto;
+    max-width: 92vw;
+  }
+  .overlay-card h2 { font-size: 1.25rem; }
+  .revealed-word { font-size: 1.5rem; }
+}

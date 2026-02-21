@@ -1026,6 +1026,27 @@ function renderPlayerList() {
     `;
     list.appendChild(li);
   });
+
+  // Mobile player strip
+  const strip = document.getElementById('mobile-player-strip');
+  if (strip) {
+    strip.innerHTML = '';
+    sorted.forEach((p, i) => {
+      const isDrawer = p.id === room.currentDrawer;
+      const chip = document.createElement('div');
+      chip.className = 'mobile-strip-chip'
+        + (isDrawer ? ' is-drawer' : '')
+        + (p.hasGuessed ? ' has-guessed' : '');
+      chip.innerHTML = `
+        <span class="mobile-strip-rank">#${i + 1}</span>
+        <span class="mobile-strip-name">${escHtml(p.name)}</span>
+        <span class="mobile-strip-score">${p.score}</span>
+        ${isDrawer ? '<span class="mobile-strip-badge">✏️</span>' : ''}
+        ${p.hasGuessed && !isDrawer ? '<span class="mobile-strip-badge" style="color:var(--green)">✓</span>' : ''}
+      `;
+      strip.appendChild(chip);
+    });
+  }
 }
 
 function updateWordDisplay(text) {
@@ -1072,6 +1093,8 @@ function setToolbarVisible(visible) {
 
 function setReactionBarVisible(visible) {
   document.getElementById('reaction-bar').classList.toggle('hidden', !visible);
+  const mobileReactionBar = document.getElementById('mobile-reaction-bar');
+  if (mobileReactionBar) mobileReactionBar.classList.toggle('hidden', !visible);
 }
 
 function onSendReaction(emoji) {
@@ -1097,9 +1120,16 @@ function showFloatingReaction(emoji) {
 }
 
 function setChatEnabled(enabled) {
+  const placeholder = enabled ? 'Type to guess…' : (State.isDrawer ? 'You are drawing…' : 'Waiting…');
   const input = document.getElementById('chat-input');
   input.disabled = !enabled;
-  input.placeholder = enabled ? 'Type to guess…' : (State.isDrawer ? 'You are drawing…' : 'Waiting…');
+  input.placeholder = placeholder;
+
+  const mobileInput = document.getElementById('mobile-chat-input');
+  if (mobileInput) {
+    mobileInput.disabled = !enabled;
+    mobileInput.placeholder = placeholder;
+  }
 }
 
 // ── Drawing Tools ──
@@ -1210,7 +1240,17 @@ function buildColorPalette() {
 
 // ── Chat ──
 function onSendChat() {
-  const input = document.getElementById('chat-input');
+  const desktopInput = document.getElementById('chat-input');
+  const mobileInput = document.getElementById('mobile-chat-input');
+  // Use whichever input has content (mobile takes priority if both somehow have text)
+  let input = desktopInput;
+  if (mobileInput && mobileInput.value.trim()) {
+    input = mobileInput;
+  } else if (desktopInput && desktopInput.value.trim()) {
+    input = desktopInput;
+  } else if (mobileInput && document.activeElement === mobileInput) {
+    input = mobileInput;
+  }
   const message = input.value.trim();
   if (!message) return;
   input.value = '';
@@ -1218,27 +1258,36 @@ function onSendChat() {
 }
 
 function addChatMsg({ type = 'chat', playerId, playerName, message }) {
-  const container = document.getElementById('chat-messages');
-  const el = document.createElement('div');
-  el.className = `chat-msg type-${type}`;
+  const containers = [
+    document.getElementById('chat-messages'),
+    document.getElementById('mobile-chat-messages'),
+  ];
 
-  if (playerName && type !== 'system' && type !== 'correct' && type !== 'close') {
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'msg-name';
-    nameSpan.style.color = playerColor(playerId);
-    nameSpan.textContent = playerName + ':';
-    el.appendChild(nameSpan);
-    el.appendChild(document.createTextNode(' ' + message));
-  } else {
-    el.textContent = message;
-  }
+  containers.forEach(container => {
+    if (!container) return;
+    const el = document.createElement('div');
+    el.className = `chat-msg type-${type}`;
 
-  container.appendChild(el);
-  container.scrollTop = container.scrollHeight;
+    if (playerName && type !== 'system' && type !== 'correct' && type !== 'close') {
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'msg-name';
+      nameSpan.style.color = playerColor(playerId);
+      nameSpan.textContent = playerName + ':';
+      el.appendChild(nameSpan);
+      el.appendChild(document.createTextNode(' ' + message));
+    } else {
+      el.textContent = message;
+    }
+
+    container.appendChild(el);
+    container.scrollTop = container.scrollHeight;
+  });
 }
 
 function clearChat() {
   document.getElementById('chat-messages').innerHTML = '';
+  const mobileChat = document.getElementById('mobile-chat-messages');
+  if (mobileChat) mobileChat.innerHTML = '';
 }
 
 // Simple hash-based color for player names in chat

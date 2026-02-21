@@ -162,6 +162,9 @@
       </div>
     </div>
 
+    <!-- Mobile player strip (hidden on desktop, shown on mobile) -->
+    <div id="mobile-player-strip" class="mobile-player-strip"></div>
+
     <!-- Main 3-column layout -->
     <div id="game-layout">
 
@@ -244,6 +247,23 @@
           <button class="btn btn-sm btn-primary" onclick="onSendChat()">Send</button>
         </div>
       </aside>
+    </div>
+
+    <!-- Mobile chat (hidden on desktop, shown on mobile) -->
+    <div id="mobile-chat" class="mobile-chat">
+      <div id="mobile-chat-messages" class="chat-messages"></div>
+      <div id="mobile-reaction-bar" class="reaction-bar hidden">
+        <button class="reaction-btn" title="Nice!" onclick="onSendReaction('👍')">👍</button>
+        <button class="reaction-btn" title="Meh"   onclick="onSendReaction('😐')">😐</button>
+        <button class="reaction-btn" title="Nope"  onclick="onSendReaction('👎')">👎</button>
+        <button class="reaction-btn" title="Wow!"  onclick="onSendReaction('🔥')">🔥</button>
+        <button class="reaction-btn" title="Haha"  onclick="onSendReaction('😂')">😂</button>
+      </div>
+      <div class="chat-input-row">
+        <input id="mobile-chat-input" type="text" maxlength="200" placeholder="Type to guess…" autocomplete="off"
+               onkeydown="if(event.key==='Enter') onSendChat()" />
+        <button class="btn btn-sm btn-primary" onclick="onSendChat()">Send</button>
+      </div>
     </div>
   </div>
 
