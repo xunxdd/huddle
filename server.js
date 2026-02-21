@@ -7,6 +7,7 @@ const WordBombManager = require('./src/wordBombManager');
 const WordleManager = require('./src/wordleManager');
 const Game24Manager      = require('./src/game24Manager');
 const CountdownManager   = require('./src/countdownManager');
+const TriviaManager      = require('./src/triviaManager');
 
 const app = express();
 const server = http.createServer(app);
@@ -61,6 +62,14 @@ app.get('/countdown/join/:code', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'countdown.html'));
 });
 
+// Trivia page + invite links
+app.get('/trivia', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'trivia.html'));
+});
+app.get('/trivia/join/:code', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'trivia.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const gm  = new GameManager(io);
@@ -68,6 +77,7 @@ const wbm = new WordBombManager(io);
 const wm  = new WordleManager(io);
 const g24 = new Game24Manager(io);
 const cdm = new CountdownManager(io);
+const tvm = new TriviaManager(io);
 
 function broadcastRoomList() {
   const rooms = gm.getOpenRooms();
@@ -92,6 +102,9 @@ function getLobbyList() {
   }
   for (const r of cdm.getOpenRooms()) {
     list.push({ id: r.id, game: 'Countdown', gameIcon: '🎯', joinUrl: `/countdown/join/${r.id}`, ownerName: r.ownerName, playerCount: r.playerCount, maxPlayers: r.maxPlayers });
+  }
+  for (const r of tvm.getOpenRooms()) {
+    list.push({ id: r.id, game: 'Trivia', gameIcon: '🧠', joinUrl: `/trivia/join/${r.id}`, ownerName: r.ownerName, playerCount: r.playerCount, maxPlayers: r.maxPlayers });
   }
 
   return list;
@@ -207,6 +220,15 @@ io.on('connection', (socket) => {
   socket.on('cd:submit', d  => cdm.handleSubmit(socket, d || {}));
   socket.on('cd:reset',  id => { cdm.resetRoom(socket, id); broadcastLobbyList(); });
 
+  // ── Trivia ──────────────────────────────────────────────────────────────
+  socket.on('tv:create', d  => { tvm.createRoom(socket, d || {}); broadcastLobbyList(); });
+  socket.on('tv:join',   d  => { tvm.joinRoom(socket, d || {}); broadcastLobbyList(); });
+  socket.on('tv:leave',  () => { tvm.leaveRoom(socket); broadcastLobbyList(); });
+  socket.on('tv:start',  id => { tvm.startGame(socket, id); broadcastLobbyList(); });
+  socket.on('tv:vote',   d  => tvm.handleVote(socket, d || {}));
+  socket.on('tv:answer', d  => tvm.handleAnswer(socket, d || {}));
+  socket.on('tv:reset',  id => { tvm.resetRoom(socket, id); broadcastLobbyList(); });
+
   socket.on('disconnect', () => {
     console.log(`- disconnected: ${socket.id}`);
     gm.handleDisconnect(socket);
@@ -215,6 +237,7 @@ io.on('connection', (socket) => {
     wm.leaveRoom(socket);
     g24.leaveRoom(socket);
     cdm.leaveRoom(socket);
+    tvm.leaveRoom(socket);
     broadcastLobbyList();
   });
 });
