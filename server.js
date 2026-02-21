@@ -154,7 +154,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log(`- disconnected: ${socket.id}`);
-    gm.leaveRoom(socket);
+    gm.handleDisconnect(socket);
     wbm.leaveRoom(socket);
     wm.leaveRoom(socket);
     g24.leaveRoom(socket);

@@ -7,6 +7,7 @@ class GameManager {
     this.io = io;
     this.rooms = new Map();       // roomId -> room
     this.playerRooms = new Map(); // socketId -> roomId
+    this.disconnectTimers = new Map(); // socketId -> { timer, roomId, playerData }
   }
 
   // ─── Room Code ────────────────────────────────────────────────────────────
@@ -93,10 +94,6 @@ class GameManager {
       socket.emit('room:error', { message: 'Room not found. Check the code and try again.' });
       return;
     }
-    if (room.state !== 'lobby') {
-      socket.emit('room:error', { message: 'Game already in progress. Wait for the next round.' });
-      return;
-    }
     if (room.players.size >= room.maxPlayers) {
       socket.emit('room:error', { message: 'Room is full.' });
       return;
@@ -106,10 +103,25 @@ class GameManager {
       return;
     }
 
+    // Cancel pending disconnect timer for the same player (reconnecting)
+    for (const [oldSocketId, pending] of this.disconnectTimers) {
+      if (pending.roomId === code && pending.playerName === username) {
+        clearTimeout(pending.timer);
+        this.disconnectTimers.delete(oldSocketId);
+        // Clean up the old player entry
+        room.players.delete(oldSocketId);
+        this.playerRooms.delete(oldSocketId);
+        console.log(`${username} reconnected to room ${code}, cancelled disconnect timer`);
+        break;
+      }
+    }
+
     const player = this._makePlayer(socket.id, username);
     room.players.set(socket.id, player);
     this.playerRooms.set(socket.id, code);
     socket.join(code);
+
+    const midGame = room.state !== 'lobby' && room.state !== 'game_end';
 
     socket.emit('room:joined', {
       roomId: code,
@@ -117,6 +129,13 @@ class GameManager {
       room: this._roomPublic(room),
       categoryVotes: room.categoryVotes,
       myVoteCategory: room.playerVotes[socket.id] || null,
+      midGame: midGame ? {
+        currentDrawer: room.currentDrawer,
+        drawerName: room.players.get(room.currentDrawer)?.name || 'Unknown',
+        wordDisplay: room.wordDisplay || '',
+        wordLength: room.currentWord ? room.currentWord.length : 0,
+        timeLeft: room.timeLeft,
+      } : null,
     });
 
     socket.to(code).emit('room:playerJoined', {
@@ -127,10 +146,55 @@ class GameManager {
     console.log(`${player.name} joined room ${code}`);
   }
 
+  // Called when a socket disconnects — uses a grace period during active games
+  handleDisconnect(socket) {
+    const roomId = this.playerRooms.get(socket.id);
+    if (!roomId) return;
+
+    const room = this.rooms.get(roomId);
+    if (!room) {
+      this.playerRooms.delete(socket.id);
+      return;
+    }
+
+    const inGame = room.state !== 'lobby' && room.state !== 'game_end';
+    if (inGame) {
+      const player = room.players.get(socket.id);
+      console.log(`${player?.name} disconnected from room ${roomId}, waiting 15s for reconnect`);
+      this.disconnectTimers.set(socket.id, {
+        timer: setTimeout(() => {
+          this.disconnectTimers.delete(socket.id);
+          this._removePlayer(socket, roomId);
+        }, 15000),
+        roomId,
+        playerName: player?.name,
+      });
+      return;
+    }
+
+    this._removePlayer(socket, roomId);
+  }
+
+  // Called when a player intentionally leaves (room:leave button)
   leaveRoom(socket) {
     const roomId = this.playerRooms.get(socket.id);
     if (!roomId) return;
 
+    // Cancel any pending disconnect timer
+    this._cancelDisconnectTimer(socket.id);
+
+    this._removePlayer(socket, roomId);
+  }
+
+  _cancelDisconnectTimer(socketId) {
+    const pending = this.disconnectTimers.get(socketId);
+    if (pending) {
+      clearTimeout(pending.timer);
+      this.disconnectTimers.delete(socketId);
+    }
+  }
+
+  _removePlayer(socket, roomId) {
     const room = this.rooms.get(roomId);
     if (!room) {
       this.playerRooms.delete(socket.id);
@@ -253,7 +317,7 @@ class GameManager {
       socket.emit('room:error', { message: 'Game already running.' });
       return;
     }
-    if (room.players.size < 1) {
+    if (room.players.size < 2) {
       socket.emit('room:error', { message: 'Need at least 2 players to start.' });
       return;
     }

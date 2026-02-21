@@ -31,6 +31,7 @@ const State = {
   playerId: null,
   roomId: null,
   room: null,
+  username: null,
   isOwner: false,
   isDrawer: false,
   hasGuessed: false,
@@ -103,22 +104,53 @@ function initSocket() {
   s.on('connect', () => {
     State.playerId = s.id;
     console.log('Connected:', s.id);
+
+    // Rejoin room after reconnection
+    if (State.roomId && State.username) {
+      console.log('Reconnecting to room', State.roomId);
+      s.emit('room:join', { username: State.username, roomId: State.roomId });
+    }
   });
 
-  s.on('room:joined', ({ roomId, playerId, room, categoryVotes, myVoteCategory }) => {
+  s.on('room:joined', ({ roomId, playerId, room, categoryVotes, myVoteCategory, midGame }) => {
     State.playerId = playerId;
     State.roomId = roomId;
     State.room = room;
     State.isOwner = room.owner === playerId;
     State.categoryVotes = categoryVotes || {};
     State.myVoteCategory = myVoteCategory || null;
-    showScreen('waiting');
-    renderWaitingRoom();
+
+    if (midGame) {
+      // Joining a game already in progress
+      State.hasGuessed = false;
+      State.currentWord = null;
+      State.isDrawer = false;
+      showScreen('game');
+      clearCanvas();
+      clearChat();
+      hideAllOverlays();
+      renderPlayerList();
+      document.getElementById('top-round').textContent = room.currentRound || 1;
+      document.getElementById('top-totalrounds').textContent = room.totalRounds;
+      updateWordDisplay(midGame.wordDisplay + (midGame.wordLength ? `  (${midGame.wordLength} letters)` : ''));
+      setDrawingEnabled(false);
+      setChatEnabled(true);
+      setReactionBarVisible(true);
+      updateTimer(midGame.timeLeft, room.drawTime);
+      addChatMsg({ type: 'system', message: `${midGame.drawerName} is drawing!` });
+    } else {
+      showScreen('waiting');
+      renderWaitingRoom();
+    }
   });
 
   s.on('room:playerJoined', ({ player, room }) => {
     State.room = room;
-    renderWaitingRoom();
+    if (currentScreen() === 'waiting') {
+      renderWaitingRoom();
+    } else if (currentScreen() === 'game') {
+      renderPlayerList();
+    }
     addChatMsg({ type: 'system', message: `${player.name} joined the room.` });
     SFX.join();
   });
@@ -788,6 +820,7 @@ function onCreateRoom() {
   const rawWords    = document.getElementById('set-customwords').value;
   const customWords = rawWords.split('\n').map(w => w.trim()).filter(Boolean);
 
+  State.username = username;
   State.socket.emit('room:create', { username, rounds, drawTime, maxPlayers, customWords, customOnly });
 }
 
@@ -797,6 +830,7 @@ function onJoinRoom() {
   const roomId = document.getElementById('join-code').value.trim().toUpperCase();
   if (!roomId) { showLobbyError('Please enter a room code.'); return; }
 
+  State.username = username;
   State.socket.emit('room:join', { username, roomId });
 }
 
@@ -838,6 +872,7 @@ function checkInviteUrl() {
 function onDirectJoin() {
   const username = getUsername();
   if (!username) { showLobbyError('Please enter your name.'); return; }
+  State.username = username;
   State.socket.emit('room:join', { username, roomId: State._inviteCode });
 }
 
@@ -952,6 +987,7 @@ function onLeaveRoom() {
   State.socket.emit('room:leave');
   State.roomId = null;
   State.room = null;
+  State.username = null;
   State.isOwner = false;
   State.isDrawer = false;
   State.hasGuessed = false;
