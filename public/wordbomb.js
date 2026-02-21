@@ -1,6 +1,6 @@
 /* ── Word Bomb Client ───────────────────────────────────────────────────── */
 
-const socket = io();
+const socket = io({ transports: ['websocket'] });
 
 // ── State ──────────────────────────────────────────────────────────────────
 let myId        = null;

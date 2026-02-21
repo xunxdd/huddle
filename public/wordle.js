@@ -1,7 +1,7 @@
 /* ── Family Wordle Client ──────────────────────────────────────────────────── */
 'use strict';
 
-const socket = io();
+const socket = io({ transports: ['websocket'] });
 
 // ── State ───────────────────────────────────────────────────────────────────
 let myId         = null;

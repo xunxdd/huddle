@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
 //  SOCKET.IO
 // ══════════════════════════════════════════════════════════
 function initSocket() {
-  State.socket = io();
+  State.socket = io({ transports: ['websocket'] });
   const s = State.socket;
 
   s.on('connect', () => {
