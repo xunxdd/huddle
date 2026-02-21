@@ -564,8 +564,9 @@ textarea { resize: vertical; font-family: inherit; }
    MOBILE RESPONSIVE — 680px breakpoint
 ══════════════════════════════════════════════════════════ */
 @media (max-width: 680px) {
-  /* Game screen: vertical flex stack, no scroll — everything fits in viewport */
+  /* Game screen: use dvh so mobile browser chrome doesn't clip the bottom */
   #game-screen {
+    height: 100dvh;
     overflow: hidden;
   }
 
@@ -604,9 +605,8 @@ textarea { resize: vertical; font-family: inherit; }
   }
   #canvas-wrapper {
     flex: 0 0 auto;
-    height: 45vh;
-    min-height: 180px;
-    max-height: 50vh;
+    height: 36dvh;
+    min-height: 150px;
   }
   #game-canvas {
     border-radius: 2px;
@@ -629,7 +629,7 @@ textarea { resize: vertical; font-family: inherit; }
   .mobile-chat {
     display: flex;
     flex: 1 1 0;
-    min-height: 120px;
+    min-height: 0;
   }
   .mobile-chat .chat-messages {
     flex: 1;
@@ -639,6 +639,10 @@ textarea { resize: vertical; font-family: inherit; }
   }
   .mobile-chat .chat-input-row {
     padding: 0.35rem 0.4rem;
+    flex-shrink: 0;
+  }
+  .mobile-chat .reaction-bar {
+    flex-shrink: 0;
   }
 
   /* Overlays: tighter on mobile */
