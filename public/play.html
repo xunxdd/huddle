@@ -28,6 +28,14 @@
         <input id="username-input" type="text" maxlength="20" placeholder="Enter your name…" autocomplete="off" />
       </div>
 
+      <!-- Open Rooms -->
+      <div id="open-rooms">
+        <h3 class="open-rooms-title">Open Rooms</h3>
+        <div id="open-rooms-list">
+          <p class="open-rooms-empty">No open rooms</p>
+        </div>
+      </div>
+
       <!-- Direct Join Panel (shown when arriving via invite link) -->
       <div id="panel-direct-join" class="hidden">
         <p class="direct-join-msg">You've been invited to play! Enter your name to jump in.</p>
@@ -312,7 +320,7 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/sounds.js"></script>
-  <script src="/game.js"></script>
+  <script src="/game.js?v=2"></script>
   <script>mountMuteBtn(document.getElementById('mute-btn-anchor'));</script>
 </body>
 </html>

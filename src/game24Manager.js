@@ -113,6 +113,24 @@ class Game24Manager {
     this.playerRooms = new Map(); // socketId → roomId
   }
 
+  // ── Open Room Listing ──────────────────────────────────────────────────
+
+  getOpenRooms() {
+    const result = [];
+    for (const room of this.rooms.values()) {
+      if (room.state === 'lobby' && room.players.size < 8) {
+        const owner = room.players.get(room.owner);
+        result.push({
+          id: room.id,
+          ownerName: owner ? owner.name : 'Unknown',
+          playerCount: room.players.size,
+          maxPlayers: 8,
+        });
+      }
+    }
+    return result;
+  }
+
   // ── Room helpers ──────────────────────────────────────────────────────
 
   _genUniqueId() {

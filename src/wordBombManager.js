@@ -7,6 +7,24 @@ class WordBombManager {
     this.playerRooms = new Map(); // socketId -> roomId
   }
 
+  // ─── Open Room Listing ────────────────────────────────────────────────────
+
+  getOpenRooms() {
+    const result = [];
+    for (const room of this.rooms.values()) {
+      if (room.state === 'lobby' && room.players.size < room.maxPlayers) {
+        const owner = room.players.get(room.owner);
+        result.push({
+          id: room.id,
+          ownerName: owner ? owner.name : 'Unknown',
+          playerCount: room.players.size,
+          maxPlayers: room.maxPlayers,
+        });
+      }
+    }
+    return result;
+  }
+
   // ─── Room Code ─────────────────────────────────────────────────────────────
 
   _generateRoomCode() {

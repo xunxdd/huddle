@@ -105,11 +105,19 @@ function initSocket() {
     State.playerId = s.id;
     console.log('Connected:', s.id);
 
+    // Fetch open rooms for lobby
+    s.emit('room:list');
+
     // Rejoin room after reconnection
     if (State.roomId && State.username) {
       console.log('Reconnecting to room', State.roomId);
       s.emit('room:join', { username: State.username, roomId: State.roomId });
     }
+  });
+
+  s.on('room:list', (rooms) => {
+    console.log('Received room:list', rooms);
+    renderOpenRooms(rooms);
   });
 
   s.on('room:joined', ({ roomId, playerId, room, categoryVotes, myVoteCategory, midGame }) => {
@@ -877,9 +885,10 @@ function checkInviteUrl() {
   // Store code so onDirectJoin() can use it
   State._inviteCode = code;
 
-  // Hide create/join panels, show direct-join panel
+  // Hide create/join panels and room list, show direct-join panel
   document.getElementById('panel-create').classList.add('hidden');
   document.getElementById('panel-join').classList.add('hidden');
+  document.getElementById('open-rooms').classList.add('hidden');
   document.getElementById('panel-direct-join').classList.remove('hidden');
 
   // Enter key submits direct join
@@ -895,12 +904,40 @@ function onDirectJoin() {
   State.socket.emit('room:join', { username, roomId: State._inviteCode });
 }
 
+function renderOpenRooms(rooms) {
+  const container = document.getElementById('open-rooms-list');
+  if (!container) return;
+
+  if (!rooms || rooms.length === 0) {
+    container.innerHTML = '<p class="open-rooms-empty">No open rooms</p>';
+    return;
+  }
+
+  container.innerHTML = '';
+  rooms.forEach(room => {
+    const row = document.createElement('div');
+    row.className = 'open-room-row';
+    row.innerHTML = `
+      <span class="open-room-owner">${escHtml(room.ownerName)}'s room</span>
+      <span class="open-room-info">${room.playerCount}/${room.maxPlayers}</span>
+      <button class="btn btn-sm btn-primary open-room-join" data-room-id="${escHtml(room.id)}">Join</button>
+    `;
+    row.querySelector('.open-room-join').addEventListener('click', () => {
+      onJoinOpenRoom(room.id);
+    });
+    container.appendChild(row);
+  });
+}
+
+function onJoinOpenRoom(roomId) {
+  const username = getUsername();
+  if (!username) { showLobbyError('Please enter a name.'); return; }
+  State.username = username;
+  State.socket.emit('room:join', { username, roomId });
+}
+
 function showLobbyDefault() {
-  State._inviteCode = null;
-  // Clear the invite path from the URL without reloading
-  window.history.replaceState(null, '', '/');
-  document.getElementById('panel-direct-join').classList.add('hidden');
-  document.getElementById('panel-create').classList.remove('hidden');
+  window.location.href = '/join';
 }
 
 // ══════════════════════════════════════════════════════════

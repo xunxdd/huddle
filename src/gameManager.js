@@ -8,6 +8,7 @@ class GameManager {
     this.rooms = new Map();       // roomId -> room
     this.playerRooms = new Map(); // socketId -> roomId
     this.disconnectTimers = new Map(); // socketId -> { timer, roomId, playerData }
+    this.onRoomListChanged = null; // callback set by server.js
   }
 
   // ─── Room Code ────────────────────────────────────────────────────────────
@@ -21,6 +22,26 @@ class GameManager {
       ).join('');
     } while (this.rooms.has(code));
     return code;
+  }
+
+  // ─── Open Room Listing ──────────────────────────────────────────────────
+
+  getOpenRooms() {
+    const result = [];
+    for (const room of this.rooms.values()) {
+      if (room.state === 'lobby' && room.players.size < room.maxPlayers) {
+        const owner = room.players.get(room.owner);
+        result.push({
+          id: room.id,
+          ownerName: owner ? owner.name : 'Unknown',
+          playerCount: room.players.size,
+          maxPlayers: room.maxPlayers,
+          rounds: room.totalRounds,
+          drawTime: room.drawTime,
+        });
+      }
+    }
+    return result;
   }
 
   // ─── Room Management ─────────────────────────────────────────────────────
@@ -139,9 +160,9 @@ class GameManager {
 
     // Only create a new player entry if we didn't already restore one above
     if (!room.players.has(socket.id)) {
-      const player = this._makePlayer(socket.id, username);
-      room.players.set(socket.id, player);
+      room.players.set(socket.id, this._makePlayer(socket.id, username));
     }
+    const player = room.players.get(socket.id);
     this.playerRooms.set(socket.id, code);
     socket.join(code);
 
@@ -705,6 +726,7 @@ class GameManager {
           room: this._roomPublic(room),
           categoryVotes: {},
         });
+        if (this.onRoomListChanged) this.onRoomListChanged();
       }
     }, 15000);
   }

@@ -14,6 +14,11 @@ const io = new Server(server, {
   cors: { origin: '*' },
 });
 
+// Browse open rooms page
+app.get('/join', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'join.html'));
+});
+
 // Game page
 app.get('/play', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'play.html'));
@@ -64,23 +69,73 @@ const wm  = new WordleManager(io);
 const g24 = new Game24Manager(io);
 const cdm = new CountdownManager(io);
 
+function broadcastRoomList() {
+  const rooms = gm.getOpenRooms();
+  console.log('Broadcasting room list:', rooms.length, 'rooms', JSON.stringify(rooms));
+  io.emit('room:list', rooms);
+}
+
+function getLobbyList() {
+  const list = [];
+
+  for (const r of gm.getOpenRooms()) {
+    list.push({ id: r.id, game: 'Scribble-O', gameIcon: '🎨', joinUrl: `/join/${r.id}`, ownerName: r.ownerName, playerCount: r.playerCount, maxPlayers: r.maxPlayers });
+  }
+  for (const r of wbm.getOpenRooms()) {
+    list.push({ id: r.id, game: 'Word Bomb', gameIcon: '💣', joinUrl: `/wordbomb/join/${r.id}`, ownerName: r.ownerName, playerCount: r.playerCount, maxPlayers: r.maxPlayers });
+  }
+  for (const r of wm.getOpenRooms()) {
+    list.push({ id: r.id, game: 'Family Wordle', gameIcon: '🟩', joinUrl: `/wordle/join/${r.id}`, ownerName: r.ownerName, playerCount: r.playerCount, maxPlayers: r.maxPlayers });
+  }
+  for (const r of g24.getOpenRooms()) {
+    list.push({ id: r.id, game: 'The 24 Game', gameIcon: '🔢', joinUrl: `/game24/join/${r.id}`, ownerName: r.ownerName, playerCount: r.playerCount, maxPlayers: r.maxPlayers });
+  }
+  for (const r of cdm.getOpenRooms()) {
+    list.push({ id: r.id, game: 'Countdown', gameIcon: '🎯', joinUrl: `/countdown/join/${r.id}`, ownerName: r.ownerName, playerCount: r.playerCount, maxPlayers: r.maxPlayers });
+  }
+
+  return list;
+}
+
+function broadcastLobbyList() {
+  io.emit('lobby:list', getLobbyList());
+}
+
+gm.onRoomListChanged = () => { broadcastRoomList(); broadcastLobbyList(); };
+
 io.on('connection', (socket) => {
   console.log(`+ connected: ${socket.id}`);
 
+  socket.on('room:list', () => {
+    socket.emit('room:list', gm.getOpenRooms());
+  });
+
+  socket.on('lobby:list', () => {
+    socket.emit('lobby:list', getLobbyList());
+  });
+
   socket.on('room:create', (data) => {
     gm.createRoom(socket, data || {});
+    broadcastRoomList();
+    broadcastLobbyList();
   });
 
   socket.on('room:join', (data) => {
     gm.joinRoom(socket, data || {});
+    broadcastRoomList();
+    broadcastLobbyList();
   });
 
   socket.on('room:leave', () => {
     gm.leaveRoom(socket);
+    broadcastRoomList();
+    broadcastLobbyList();
   });
 
   socket.on('game:start', (roomId) => {
     gm.startGame(socket, roomId);
+    broadcastRoomList();
+    broadcastLobbyList();
   });
 
   socket.on('game:chooseWord', (data) => {
@@ -120,45 +175,47 @@ io.on('connection', (socket) => {
   });
 
   // ── Word Bomb ────────────────────────────────────────────────────────────
-  socket.on('wb:create',     (d)  => wbm.createRoom(socket, d || {}));
-  socket.on('wb:join',       (d)  => wbm.joinRoom(socket, d || {}));
-  socket.on('wb:leave',      ()   => wbm.leaveRoom(socket));
-  socket.on('wb:start',      (id) => wbm.startGame(socket, id));
+  socket.on('wb:create',     (d)  => { wbm.createRoom(socket, d || {}); broadcastLobbyList(); });
+  socket.on('wb:join',       (d)  => { wbm.joinRoom(socket, d || {}); broadcastLobbyList(); });
+  socket.on('wb:leave',      ()   => { wbm.leaveRoom(socket); broadcastLobbyList(); });
+  socket.on('wb:start',      (id) => { wbm.startGame(socket, id); broadcastLobbyList(); });
   socket.on('wb:submitWord', (d)  => wbm.handleSubmitWord(socket, d || {}));
-  socket.on('wb:reset',      (id) => wbm.resetRoom(socket, id));
+  socket.on('wb:reset',      (id) => { wbm.resetRoom(socket, id); broadcastLobbyList(); });
 
   // ── Family Wordle ─────────────────────────────────────────────────────────
-  socket.on('fw:create',      d  => wm.createRoom(socket, d || {}));
-  socket.on('fw:join',        d  => wm.joinRoom(socket, d || {}));
-  socket.on('fw:leave',       () => wm.leaveRoom(socket));
-  socket.on('fw:start',       id => wm.startGame(socket, id));
+  socket.on('fw:create',      d  => { wm.createRoom(socket, d || {}); broadcastLobbyList(); });
+  socket.on('fw:join',        d  => { wm.joinRoom(socket, d || {}); broadcastLobbyList(); });
+  socket.on('fw:leave',       () => { wm.leaveRoom(socket); broadcastLobbyList(); });
+  socket.on('fw:start',       id => { wm.startGame(socket, id); broadcastLobbyList(); });
   socket.on('fw:submitGuess', d  => wm.handleSubmitGuess(socket, d || {}));
-  socket.on('fw:reset',       id => wm.resetRoom(socket, id));
+  socket.on('fw:reset',       id => { wm.resetRoom(socket, id); broadcastLobbyList(); });
 
   // ── The 24 Game ───────────────────────────────────────────────────────────
-  socket.on('g24:create', d  => g24.createRoom(socket, d || {}));
-  socket.on('g24:join',   d  => g24.joinRoom(socket, d || {}));
-  socket.on('g24:leave',  () => g24.leaveRoom(socket));
-  socket.on('g24:start',  id => g24.startGame(socket, id));
+  socket.on('g24:create', d  => { g24.createRoom(socket, d || {}); broadcastLobbyList(); });
+  socket.on('g24:join',   d  => { g24.joinRoom(socket, d || {}); broadcastLobbyList(); });
+  socket.on('g24:leave',  () => { g24.leaveRoom(socket); broadcastLobbyList(); });
+  socket.on('g24:start',  id => { g24.startGame(socket, id); broadcastLobbyList(); });
   socket.on('g24:submit', d  => g24.handleSubmit(socket, d || {}));
-  socket.on('g24:reset',  id => g24.resetRoom(socket, id));
+  socket.on('g24:reset',  id => { g24.resetRoom(socket, id); broadcastLobbyList(); });
 
   // ── Countdown Numbers ─────────────────────────────────────────────────────
-  socket.on('cd:create', d  => cdm.createRoom(socket, d || {}));
-  socket.on('cd:join',   d  => cdm.joinRoom(socket, d || {}));
-  socket.on('cd:leave',  () => cdm.leaveRoom(socket));
-  socket.on('cd:start',  id => cdm.startGame(socket, id));
+  socket.on('cd:create', d  => { cdm.createRoom(socket, d || {}); broadcastLobbyList(); });
+  socket.on('cd:join',   d  => { cdm.joinRoom(socket, d || {}); broadcastLobbyList(); });
+  socket.on('cd:leave',  () => { cdm.leaveRoom(socket); broadcastLobbyList(); });
+  socket.on('cd:start',  id => { cdm.startGame(socket, id); broadcastLobbyList(); });
   socket.on('cd:pick',   d  => cdm.handlePick(socket, d || {}));
   socket.on('cd:submit', d  => cdm.handleSubmit(socket, d || {}));
-  socket.on('cd:reset',  id => cdm.resetRoom(socket, id));
+  socket.on('cd:reset',  id => { cdm.resetRoom(socket, id); broadcastLobbyList(); });
 
   socket.on('disconnect', () => {
     console.log(`- disconnected: ${socket.id}`);
     gm.handleDisconnect(socket);
+    broadcastRoomList();
     wbm.leaveRoom(socket);
     wm.leaveRoom(socket);
     g24.leaveRoom(socket);
     cdm.leaveRoom(socket);
+    broadcastLobbyList();
   });
 });
 
