@@ -381,47 +381,57 @@ class WordleManager {
       return;
     }
 
-    // Score each submission
+    // Score ALL submissions — points based on correctness, time bonus for speed
+    const scored = [];
+    const earliest = Math.min(...[...room.submissions.values()].map(s => s.submittedAt));
+    const latest   = Math.max(...[...room.submissions.values()].map(s => s.submittedAt));
+    const timeSpan = latest - earliest || 1; // avoid div-by-zero
+
     let best = null;
-    let bestScore = -1;
+    let bestTileScore = -1;
 
     for (const [socketId, sub] of room.submissions) {
-      const tiles = evaluateGuess(sub.word, room.secretWord);
-      const score = tileScore(tiles);
-      if (score > bestScore || (score === bestScore && sub.submittedAt < best.sub.submittedAt)) {
-        best      = { socketId, sub, tiles, score };
-        bestScore = score;
+      const tiles  = evaluateGuess(sub.word, room.secretWord);
+      const greens  = tiles.filter(t => t === 'correct').length;
+      const yellows = tiles.filter(t => t === 'present').length;
+      const won     = greens === 6;
+      const ts      = tileScore(tiles);
+
+      // Base points from correctness
+      let pts = 50 + greens * 30 + yellows * 10;
+      // Time bonus: faster submitters get more (up to 20 extra)
+      const speedRatio = 1 - (sub.submittedAt - earliest) / timeSpan;
+      pts += Math.round(20 * speedRatio);
+      if (won) pts += 500;
+
+      if (room.players.has(socketId)) {
+        room.players.get(socketId).score += pts;
+      }
+
+      scored.push({ socketId, sub, tiles, ts, pts, greens, yellows, won });
+
+      // Track the best word for the shared guess history row
+      if (ts > bestTileScore || (ts === bestTileScore && sub.submittedAt < best.sub.submittedAt)) {
+        best = { socketId, sub, tiles, ts, pts, greens, yellows, won };
+        bestTileScore = ts;
       }
     }
 
-    const player = room.players.get(best.socketId) || { name: 'Unknown', score: 0 };
-    const greens = best.tiles.filter(t => t === 'correct').length;
-    const yellows = best.tiles.filter(t => t === 'present').length;
-    const won    = greens === 6;
+    const bestPlayer = room.players.get(best.socketId) || { name: 'Unknown', score: 0 };
+    const won = best.won;
 
-    // Points for the player whose word was selected
-    let points = 50 + greens * 30 + yellows * 10
-               + Math.round(20 * room.timeLeft / room.timePerRound);
-    if (won) points += 500;
-
-    if (room.players.has(best.socketId)) {
-      room.players.get(best.socketId).score += points;
-    }
-
-    // All submissions summary
-    const allSubmissions = Array.from(room.submissions.entries()).map(([sid, sub]) => {
-      const p = room.players.get(sid) || { name: 'Unknown' };
-      const t = evaluateGuess(sub.word, room.secretWord);
-      const pts = sid === best.socketId ? points : 0;
-      return { playerId: sid, playerName: p.name, word: sub.word, tiles: t, points: pts };
+    // All submissions summary — every player gets their own points
+    const allSubmissions = scored.map(s => {
+      const p = room.players.get(s.socketId) || { name: 'Unknown' };
+      return { playerId: s.socketId, playerName: p.name, word: s.sub.word, tiles: s.tiles, points: s.pts };
     });
 
     room.guessHistory.push({
       word:       best.sub.word,
       tiles:      best.tiles,
       playerId:   best.socketId,
-      playerName: player.name,
-      points,
+      playerName: bestPlayer.name,
+      points:     best.pts,
     });
 
     room.currentGuess++;
@@ -431,9 +441,9 @@ class WordleManager {
       bestWord:       best.sub.word,
       tiles:          best.tiles,
       playerId:       best.socketId,
-      playerName:     player.name,
+      playerName:     bestPlayer.name,
       allSubmissions,
-      pointsAwarded:  points,
+      pointsAwarded:  best.pts,
       scores:         this._scores(room),
       won,
     });
