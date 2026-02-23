@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -8,11 +9,14 @@ const WordleManager = require('./src/wordleManager');
 const Game24Manager      = require('./src/game24Manager');
 const CountdownManager   = require('./src/countdownManager');
 const TriviaManager      = require('./src/triviaManager');
+const ApplesManager      = require('./src/applesManager');
+const GarticManager      = require('./src/garticManager');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: '*' },
+  maxHttpBufferSize: 5e6, // 5MB for canvas images
 });
 
 // Browse open rooms page
@@ -70,6 +74,22 @@ app.get('/trivia/join/:code', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'trivia.html'));
 });
 
+// Apples to Apples page + invite links
+app.get('/apples', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'apples.html'));
+});
+app.get('/apples/join/:code', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'apples.html'));
+});
+
+// Gartic Phone page + invite links
+app.get('/gartic', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'gartic.html'));
+});
+app.get('/gartic/join/:code', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'gartic.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const gm  = new GameManager(io);
@@ -78,6 +98,8 @@ const wm  = new WordleManager(io);
 const g24 = new Game24Manager(io);
 const cdm = new CountdownManager(io);
 const tvm = new TriviaManager(io);
+const aam = new ApplesManager(io);
+const gpm = new GarticManager(io);
 
 function broadcastRoomList() {
   const rooms = gm.getOpenRooms();
@@ -105,6 +127,12 @@ function getLobbyList() {
   }
   for (const r of tvm.getOpenRooms()) {
     list.push({ id: r.id, game: 'Trivia', gameIcon: '🧠', joinUrl: `/trivia/join/${r.id}`, ownerName: r.ownerName, playerCount: r.playerCount, maxPlayers: r.maxPlayers });
+  }
+  for (const r of aam.getOpenRooms()) {
+    list.push({ id: r.id, game: 'Apples to Apples', gameIcon: '🍎', joinUrl: `/apples/join/${r.id}`, ownerName: r.ownerName, playerCount: r.playerCount, maxPlayers: r.maxPlayers });
+  }
+  for (const r of gpm.getOpenRooms()) {
+    list.push({ id: r.id, game: 'Gartic Phone', gameIcon: '📞', joinUrl: `/gartic/join/${r.id}`, ownerName: r.ownerName, playerCount: r.playerCount, maxPlayers: r.maxPlayers });
   }
 
   return list;
@@ -225,9 +253,27 @@ io.on('connection', (socket) => {
   socket.on('tv:join',   d  => { tvm.joinRoom(socket, d || {}); broadcastLobbyList(); });
   socket.on('tv:leave',  () => { tvm.leaveRoom(socket); broadcastLobbyList(); });
   socket.on('tv:start',  id => { tvm.startGame(socket, id); broadcastLobbyList(); });
-  socket.on('tv:vote',   d  => tvm.handleVote(socket, d || {}));
   socket.on('tv:answer', d  => tvm.handleAnswer(socket, d || {}));
   socket.on('tv:reset',  id => { tvm.resetRoom(socket, id); broadcastLobbyList(); });
+
+  // ── Apples to Apples ───────────────────────────────────────────────────
+  socket.on('aa:create', d  => { aam.createRoom(socket, d || {}); broadcastLobbyList(); });
+  socket.on('aa:join',   d  => { aam.joinRoom(socket, d || {}); broadcastLobbyList(); });
+  socket.on('aa:leave',  () => { aam.leaveRoom(socket); broadcastLobbyList(); });
+  socket.on('aa:start',  id => { aam.startGame(socket, id); broadcastLobbyList(); });
+  socket.on('aa:submit', d  => aam.handleSubmit(socket, d || {}));
+  socket.on('aa:judge',  d  => aam.handleJudge(socket, d || {}));
+  socket.on('aa:reset',  id => { aam.resetRoom(socket, id); broadcastLobbyList(); });
+
+  // ── Gartic Phone ──────────────────────────────────────────────────────
+  socket.on('gp:create',        d  => { gpm.createRoom(socket, d || {}); broadcastLobbyList(); });
+  socket.on('gp:join',          d  => { gpm.joinRoom(socket, d || {}); broadcastLobbyList(); });
+  socket.on('gp:leave',         () => { gpm.leaveRoom(socket); broadcastLobbyList(); });
+  socket.on('gp:start',         id => { gpm.startGame(socket, id); broadcastLobbyList(); });
+  socket.on('gp:submitText',    d  => gpm.handleSubmitText(socket, d || {}));
+  socket.on('gp:submitDrawing', d  => gpm.handleSubmitDrawing(socket, d || {}));
+  socket.on('gp:revealNext',    id => gpm.handleRevealNext(socket, id));
+  socket.on('gp:reset',         id => { gpm.resetRoom(socket, id); broadcastLobbyList(); });
 
   socket.on('disconnect', () => {
     console.log(`- disconnected: ${socket.id}`);
@@ -238,6 +284,8 @@ io.on('connection', (socket) => {
     g24.leaveRoom(socket);
     cdm.leaveRoom(socket);
     tvm.leaveRoom(socket);
+    aam.leaveRoom(socket);
+    gpm.leaveRoom(socket);
     broadcastLobbyList();
   });
 });

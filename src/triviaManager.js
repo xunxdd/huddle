@@ -56,7 +56,92 @@ function shuffle(arr) {
   return arr;
 }
 
-async function fetchQuestion(categoryId) {
+// ── AI Question Generation ─────────────────────────────────────────────────
+
+const QUESTION_PROMPT = `You write questions for a party game that's like Cards Against Humanity meets trivia — irreverent, funny, and full of "wait, WHAT?" moments. But keep it clean and non-offensive.
+
+Category: "{CATEGORY}"
+
+The vibe: Players should LAUGH when they hear the question or the answer. The best questions make people say "No way!" or "That can't be real!" or debate loudly.
+
+QUESTION STYLES (mix these up, don't repeat the same style):
+
+1. "Which of these is REAL?" — One answer is a real absurd fact, the others are made up
+   Example: "Which of these is a real job title?" → "Professional Cuddler" (real!) vs fake ones
+
+2. "Finish the headline" — A real or plausible bizarre news headline with a missing piece
+   Example: "Florida Man was arrested for throwing ____ at a Wendy's employee"
+
+3. "Cursed knowledge" — Weird-but-true facts that make people uncomfortable or amazed
+   Example: "How many spiders does the average person accidentally eat in their lifetime?" (The answer is basically zero — the 'fact' was made up to show how myths spread)
+
+4. "The price is wrong" — Absurd costs, numbers, or statistics
+   Example: "How much did someone pay for a single Cheeto shaped like Harambe on eBay?"
+
+5. "Celebrity unhinged" — Weird but real things famous people have done or said
+   Example: "What unusual item does Keanu Reeves collect?"
+
+6. "Would you believe" — Real laws, traditions, or rules that sound fake
+   Example: "In which country is it illegal to own just one guinea pig?"
+
+RULES:
+- Every question should make people laugh, gasp, or argue
+- Wrong answers should be FUNNY — not just plausible, but entertaining to consider
+- The correct answer should be surprising or delightful when revealed
+- Keep it 100% clean — no sexual content, slurs, or punching down
+- A normal person should be able to make a fun guess even if they don't know the answer
+- Keep questions under 120 characters — punchy, not wordy
+- About 40% easy, 40% medium, 20% hard
+
+Respond with ONLY valid JSON, no markdown:
+{"question":"...","correct":"...","wrong":["...","...","..."],"difficulty":"easy|medium|hard"}`;
+
+async function fetchQuestionAI(categoryName) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: process.env.TRIVIA_MODEL || 'gpt-4o-mini',
+        temperature: 1.0,
+        max_tokens: 300,
+        messages: [
+          { role: 'user', content: QUESTION_PROMPT.replace('{CATEGORY}', categoryName) },
+        ],
+      }),
+    });
+
+    if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
+    const data = await resp.json();
+    const text = data.choices[0].message.content.trim();
+    const parsed = JSON.parse(text);
+
+    if (!parsed.question || !parsed.correct || !Array.isArray(parsed.wrong) || parsed.wrong.length < 3) {
+      throw new Error('Invalid AI response shape');
+    }
+
+    const answers = shuffle([parsed.correct, ...parsed.wrong.slice(0, 3)]);
+    return {
+      question: parsed.question,
+      category: categoryName,
+      difficulty: parsed.difficulty || 'medium',
+      answers,
+      correctIndex: answers.indexOf(parsed.correct),
+      correctAnswer: parsed.correct,
+    };
+  } catch (err) {
+    console.error('[TV] AI question generation failed:', err.message);
+    return null;
+  }
+}
+
+async function fetchQuestionOpenTDB(categoryId) {
   try {
     const resp = await fetch(`https://opentdb.com/api.php?amount=1&category=${categoryId}&type=multiple`);
     const data = await resp.json();
@@ -78,9 +163,23 @@ async function fetchQuestion(categoryId) {
       correctAnswer: correct,
     };
   } catch (err) {
-    console.error('[TV] API fetch failed, using fallback:', err.message);
-    return _pickFallback();
+    console.error('[TV] OpenTDB fetch failed:', err.message);
+    return null;
   }
+}
+
+async function fetchQuestion(categoryId) {
+  const cat = CATEGORIES.find(c => c.id === categoryId);
+  const categoryName = cat ? cat.name : 'General Knowledge';
+
+  // Try AI first, then OpenTDB, then hardcoded fallback
+  const aiQ = await fetchQuestionAI(categoryName);
+  if (aiQ) return aiQ;
+
+  const tdbQ = await fetchQuestionOpenTDB(categoryId);
+  if (tdbQ) return tdbQ;
+
+  return _pickFallback();
 }
 
 function _pickFallback() {
@@ -191,8 +290,6 @@ class TriviaManager {
       totalRounds: Math.max(1, Math.min(totalRounds, 15)),
       timePerQuestion: Math.max(10, Math.min(timePerQuestion, 30)),
       // Phase data
-      voteOptions: [],
-      votes: new Map(),
       currentQuestion: null,
       answers: new Map(),
       questionStartTime: 0,
@@ -286,8 +383,7 @@ class TriviaManager {
       room.owner = room.players.keys().next().value;
     }
 
-    // Remove from votes/answers if game in progress
-    room.votes.delete(socket.id);
+    // Remove from answers if game in progress
     room.answers.delete(socket.id);
 
     this.io.to(roomId).emit('tv:playerLeft', {
@@ -325,101 +421,22 @@ class TriviaManager {
     }
 
     room.currentRound = 0;
-    room.state = 'voting';
 
     this.io.to(roomId).emit('tv:started', { room: this._roomPublic(room) });
     console.log(`[TV] Game started in room ${roomId}`);
 
-    this._startVotePhase(room);
+    this._startNextRound(room);
   }
 
-  // ─── Vote Phase ─────────────────────────────────────────────────────────
+  // ─── Next Round (random category, no voting) ───────────────────────────
 
-  _startVotePhase(room) {
+  _startNextRound(room) {
     room.currentRound++;
-    room.state = 'voting';
-    room.votes = new Map();
+    room.state = 'question';
 
-    // Pick 6 random categories
-    const shuffled = shuffle([...CATEGORIES]);
-    room.voteOptions = shuffled.slice(0, 6).map(c => ({
-      id: c.id,
-      name: c.name,
-      emoji: c.emoji,
-    }));
-
-    room.timeLeft = 10;
-
-    this.io.to(room.id).emit('tv:voteStart', {
-      round: room.currentRound,
-      totalRounds: room.totalRounds,
-      categories: room.voteOptions,
-      timeLeft: room.timeLeft,
-      scores: this._scores(room),
-    });
-
-    this._startTick(room, 10, () => this._resolveVote(room));
-  }
-
-  handleVote(socket, data) {
-    const roomId = this.playerRooms.get(socket.id);
-    if (!roomId) return;
-    const room = this.rooms.get(roomId);
-    if (!room || room.state !== 'voting') return;
-
-    const { categoryId } = data;
-    if (room.votes.has(socket.id)) return; // already voted
-
-    // Validate category is one of the options
-    if (!room.voteOptions.find(c => c.id === categoryId)) return;
-
-    room.votes.set(socket.id, categoryId);
-
-    this.io.to(room.id).emit('tv:playerVoted', {
-      playerId: socket.id,
-      voteCount: room.votes.size,
-      totalPlayers: room.players.size,
-    });
-
-    // All voted? Resolve immediately
-    if (room.votes.size >= room.players.size) {
-      this._resolveVote(room);
-    }
-  }
-
-  _resolveVote(room) {
-    if (room.state !== 'voting') return;
-    this._clearTimers(room);
-
-    // Tally votes
-    const tally = new Map();
-    for (const catId of room.votes.values()) {
-      tally.set(catId, (tally.get(catId) || 0) + 1);
-    }
-
-    let winnerCat;
-    if (tally.size === 0) {
-      // No votes — pick random from options
-      winnerCat = room.voteOptions[Math.floor(Math.random() * room.voteOptions.length)];
-    } else {
-      // Find max vote count, random tiebreak
-      const maxVotes = Math.max(...tally.values());
-      const tied = [...tally.entries()].filter(([, v]) => v === maxVotes);
-      const winnerId = tied[Math.floor(Math.random() * tied.length)][0];
-      winnerCat = room.voteOptions.find(c => c.id === winnerId);
-    }
-
-    room.state = 'question'; // transitioning
-
-    this.io.to(room.id).emit('tv:voteResult', {
-      category: winnerCat,
-    });
-
-    // Brief delay for vote result display, then fetch question
-    setTimeout(() => {
-      if (room.state !== 'question') return;
-      this._fetchAndStartQuestion(room, winnerCat.id);
-    }, 2000);
+    // Pick a random category
+    const cat = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+    this._fetchAndStartQuestion(room, cat.id);
   }
 
   // ─── Question Phase ─────────────────────────────────────────────────────
@@ -532,7 +549,7 @@ class TriviaManager {
       if (room.currentRound >= room.totalRounds) {
         this._endGame(room);
       } else {
-        this._startVotePhase(room);
+        this._startNextRound(room);
       }
     }, 5000);
   }
@@ -564,8 +581,6 @@ class TriviaManager {
     this._clearTimers(room);
     room.state = 'lobby';
     room.currentRound = 0;
-    room.voteOptions = [];
-    room.votes = new Map();
     room.currentQuestion = null;
     room.answers = new Map();
     room.questionStartTime = 0;

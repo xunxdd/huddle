@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gartic Phone — Cat in a Cradle</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <script>
+    const _c = document.createElement('canvas'); _c.width = _c.height = 64;
+    const _x = _c.getContext('2d'); _x.font = '52px serif'; _x.textAlign = 'center'; _x.textBaseline = 'middle';
+    _x.fillText('🐱', 32, 36);
+    const _l = document.createElement('link'); _l.rel = 'shortcut icon'; _l.href = _c.toDataURL(); document.head.appendChild(_l);
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    body { overflow: auto; }
+
+    /* ── Shared ── */
+    .gp-title {
+      font-size: 2rem;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      text-align: center;
+      margin-bottom: 0.25rem;
+    }
+    .gp-tagline { text-align: center; color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.9rem; }
+
+    /* ── Accent color ── */
+    .gp-accent { color: #0891b2; }
+
+    /* ── Lobby ── */
+    #screen-lobby .lobby-card { max-height: 90vh; overflow-y: auto; }
+
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+    .tab-btn {
+      flex: 1;
+      padding: 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-dim);
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab-btn.active {
+      background: #0891b2;
+      border-color: #0891b2;
+      color: #fff;
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Waiting room ── */
+    #screen-waiting .lobby-card { width: 520px; }
+
+    .room-code-display { text-align: center; margin: 1rem 0; }
+    .room-code-display .code {
+      font-size: 2.5rem;
+      font-weight: 900;
+      letter-spacing: 0.15em;
+      color: #0891b2;
+      font-family: monospace;
+    }
+    .code-label { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    .player-list { margin: 1rem 0; }
+    .player-list-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin-bottom: 0.5rem;
+    }
+    .player-list-items { display: flex; flex-direction: column; gap: 0.4rem; }
+    .player-item {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--surface2);
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+    .player-avatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #0891b2;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .player-crown { font-size: 0.9rem; margin-left: auto; }
+
+    /* ── Game screen ── */
+    #screen-game {
+      width: 100vw;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      padding: 0;
+    }
+    #screen-game.hidden { display: none !important; }
+
+    /* Top bar */
+    .gp-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem;
+      flex-shrink: 0;
+    }
+    .gp-phase-info { font-size: 0.9rem; font-weight: 700; color: #0891b2; }
+
+    /* Timer arc */
+    .gp-timer-wrap { position: relative; width: 52px; height: 52px; }
+    .gp-timer-svg { width: 52px; height: 52px; transform: rotate(-90deg); }
+    .gp-timer-track { fill: none; stroke: var(--border); stroke-width: 4; }
+    .gp-timer-arc {
+      fill: none;
+      stroke: #0891b2;
+      stroke-width: 4;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.9s linear, stroke 0.3s;
+    }
+    .gp-timer-num {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      font-weight: 800;
+    }
+
+    /* Main layout */
+    .gp-main {
+      display: grid;
+      grid-template-columns: 1fr 220px;
+      gap: 0;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Center panel */
+    .gp-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      gap: 1.25rem;
+      overflow-y: auto;
+    }
+
+    /* ── Sidebar ── */
+    .gp-sidebar {
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .gp-sidebar-section {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .gp-sidebar-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-dim);
+      margin-bottom: 0.6rem;
+    }
+
+    .gp-player-list { display: flex; flex-direction: column; gap: 0.3rem; }
+    .gp-player-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      padding: 0.3rem 0;
+    }
+    .gp-player-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #0891b2;
+      flex-shrink: 0;
+    }
+    .gp-player-name { flex: 1; font-weight: 600; }
+    .gp-player-item.is-me .gp-player-name::after { content: ' (you)'; color: var(--text-dim); font-weight: 400; }
+
+    /* ── Write phase ── */
+    .gp-write-area { width: 100%; max-width: 500px; text-align: center; }
+    .gp-write-area textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 0.75rem;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 1rem;
+      font-family: inherit;
+      resize: none;
+      transition: border-color 0.15s;
+    }
+    .gp-write-area textarea:focus { outline: none; border-color: #0891b2; }
+
+    /* ── Drawing canvas ── */
+    .gp-canvas-wrap { position: relative; }
+    .gp-canvas {
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      cursor: crosshair;
+      touch-action: none;
+      background: #fff;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .gp-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      align-items: center;
+      justify-content: center;
+      margin-top: 0.5rem;
+    }
+    .gp-tool-btn {
+      width: 36px; height: 36px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .gp-tool-btn:hover { border-color: #0891b2; }
+    .gp-tool-btn.active { border-color: #0891b2; background: rgba(8,145,178,0.15); }
+
+    .gp-color-btn {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .gp-color-btn:hover { transform: scale(1.2); }
+    .gp-color-btn.active { border-color: var(--text); transform: scale(1.2); }
+
+    .gp-size-btn {
+      width: 36px; height: 36px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .gp-size-btn:hover { border-color: #0891b2; }
+    .gp-size-btn.active { border-color: #0891b2; background: rgba(8,145,178,0.15); }
+
+    .gp-separator {
+      width: 1px;
+      height: 28px;
+      background: var(--border);
+      margin: 0 0.25rem;
+    }
+
+    /* ── Guess phase ── */
+    .gp-guess-area { width: 100%; max-width: 600px; text-align: center; }
+    .gp-guess-drawing {
+      max-width: 100%;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+    .gp-guess-input {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 1rem;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    .gp-guess-input:focus { outline: none; border-color: #0891b2; }
+
+    /* ── Waiting ── */
+    .gp-waiting-msg {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text-dim);
+    }
+    .gp-progress {
+      font-size: 0.9rem;
+      color: var(--text-dim);
+    }
+
+    /* ── Prompt display ── */
+    .gp-prompt-display {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--text);
+      padding: 0.5rem 1rem;
+      background: rgba(8,145,178,0.1);
+      border: 1px solid rgba(8,145,178,0.3);
+      border-radius: 10px;
+      text-align: center;
+      max-width: 600px;
+    }
+
+    /* ── Reveal ── */
+    .gp-reveal-wrap { width: 100%; max-width: 700px; }
+    .gp-reveal-header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .gp-reveal-chain-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+    }
+    .gp-reveal-origin {
+      font-size: 1.4rem;
+      font-weight: 900;
+    }
+
+    .gp-reveal-timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .gp-reveal-step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      animation: gp-fade-in 0.4s ease;
+    }
+    @keyframes gp-fade-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .gp-reveal-step-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+    .gp-reveal-step-icon {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: #0891b2;
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .gp-reveal-text {
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 0.5rem 0;
+    }
+    .gp-reveal-drawing {
+      max-width: 100%;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .gp-reveal-nav {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+
+    /* ── Overlays ── */
+    .gp-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,15,26,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .gp-overlay.hidden { display: none !important; }
+
+    .gp-overlay-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2rem 2.5rem;
+      min-width: 320px;
+      max-width: 480px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .gp-overlay-title {
+      font-size: 1.5rem;
+      font-weight: 900;
+      margin-bottom: 1rem;
+    }
+
+    /* General button styles */
+    .btn {
+      display: inline-block;
+      padding: 0.6rem 1.5rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s;
+    }
+    .btn-primary { background: #0891b2; color: #fff; }
+    .btn-primary:hover { background: #0e7490; }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: #0891b2; color: #0891b2; }
+    .btn-full { width: 100%; margin-top: 0.5rem; padding: 0.7rem; }
+
+    /* Misc */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+      transition: color 0.15s;
+    }
+    .back-link:hover { color: var(--text); }
+
+    .copy-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .copy-btn:hover { border-color: #0891b2; color: #0891b2; }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .gp-main { grid-template-columns: 1fr; }
+      .gp-sidebar { border-left: none; border-top: 1px solid var(--border); max-height: 180px; }
+      .gp-canvas { max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Lobby ──────────────────────────────────────────────── -->
+  <div id="screen-lobby" class="screen">
+    <div class="lobby-card">
+      <a href="/" class="back-link">&larr; Back to Hub</a>
+      <div class="gp-title">📞 Gartic Phone</div>
+      <p class="gp-tagline">Draw, guess, laugh — the telephone game with pictures!</p>
+
+      <!-- Direct-join panel (shown when arriving via invite link) -->
+      <div id="lobby-direct-join" class="hidden">
+        <p style="color:var(--text-dim);font-size:0.9rem;margin-bottom:1rem;text-align:center">You've been invited! Enter your name to jump in.</p>
+        <div class="input-group">
+          <label class="input-label">Your name</label>
+          <input id="inp-username-direct" class="input-field" type="text" placeholder="Enter your name" maxlength="20" autocomplete="off" />
+        </div>
+        <button id="btn-direct-join" class="btn btn-primary btn-full">Join Game &rarr;</button>
+        <p style="text-align:center;margin-top:0.75rem">
+          <button id="btn-back-to-lobby" style="background:none;border:none;color:var(--text-dim);font-size:0.85rem;cursor:pointer">&larr; Back to lobby</button>
+        </p>
+      </div>
+
+      <div id="lobby-username-step">
+        <div class="input-group">
+          <label class="input-label">Your name</label>
+          <input id="inp-username" class="input-field" type="text" placeholder="Enter your name" maxlength="20" autocomplete="off" />
+        </div>
+        <button id="btn-continue" class="btn btn-primary btn-full">Continue &rarr;</button>
+      </div>
+
+      <div id="lobby-choice-step" class="hidden">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="create">Create Room</button>
+          <button class="tab-btn" data-tab="join">Join Room</button>
+        </div>
+
+        <!-- Create tab -->
+        <div id="tab-create" class="tab-panel active">
+          <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:1rem">3-8 players. Write prompts, draw, guess — hilarity ensues as messages get lost in translation!</p>
+          <button id="btn-create" class="btn btn-primary btn-full">Create Room</button>
+        </div>
+
+        <!-- Join tab -->
+        <div id="tab-join" class="tab-panel">
+          <div class="input-group">
+            <label class="input-label">Room code</label>
+            <input id="inp-room-code" class="input-field" type="text" placeholder="e.g. ABCD12" maxlength="6"
+              autocomplete="off" style="text-transform:uppercase;letter-spacing:0.1em" />
+          </div>
+          <button id="btn-join" class="btn btn-primary btn-full">Join Room</button>
+        </div>
+      </div>
+
+      <p id="lobby-error" class="hidden" style="color:#0891b2;font-size:0.85rem;margin-top:0.75rem;text-align:center"></p>
+    </div>
+  </div>
+
+  <!-- ── Waiting Room ───────────────────────────────────────── -->
+  <div id="screen-waiting" class="screen hidden">
+    <div class="lobby-card" style="width:520px">
+      <a href="/" class="back-link" id="waiting-back-link">&larr; Leave room</a>
+      <div class="gp-title">📞 Gartic Phone</div>
+      <div class="room-code-display">
+        <div class="code-label">Room Code</div>
+        <div class="code" id="waiting-room-code">------</div>
+        <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:0.4rem">
+          <button class="copy-btn" id="btn-copy-code">Copy Code</button>
+          <button class="copy-btn" id="btn-copy-link">🔗 Invite Link</button>
+        </div>
+        <p id="link-copied-msg" class="hidden" style="font-size:0.75rem;color:var(--green);margin-top:0.3rem">Link copied!</p>
+      </div>
+
+      <div class="player-list">
+        <div class="player-list-title">Players (<span id="waiting-player-count">0</span>/8)</div>
+        <div class="player-list-items" id="waiting-players"></div>
+      </div>
+
+      <p id="waiting-hint" style="font-size:0.8rem;color:var(--text-dim);text-align:center;margin-bottom:0.75rem">
+        Share the room code with friends! Need 3+ players.
+      </p>
+
+      <button id="btn-start" class="btn btn-primary btn-full hidden">Start Game</button>
+      <p id="waiting-not-owner" class="hidden" style="text-align:center;color:var(--text-dim);font-size:0.85rem">
+        Waiting for the host to start&hellip;
+      </p>
+    </div>
+  </div>
+
+  <!-- ── Game Screen ────────────────────────────────────────── -->
+  <div id="screen-game" class="hidden" style="display:none">
+
+    <!-- Top bar -->
+    <div class="gp-topbar">
+      <div style="display:flex;align-items:center;gap:1rem">
+        <a href="/" style="color:var(--text-dim);text-decoration:none;font-size:0.85rem;transition:color 0.15s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-dim)'">&lceil; Home</a>
+        <span class="gp-phase-info" id="hud-phase">Write</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.75rem">
+        <span class="gp-progress" id="hud-progress"></span>
+        <div class="gp-timer-wrap">
+          <svg class="gp-timer-svg" viewBox="0 0 52 52">
+            <circle class="gp-timer-track" cx="26" cy="26" r="22"/>
+            <circle class="gp-timer-arc" id="timer-arc" cx="26" cy="26" r="22"
+              stroke-dasharray="138.2" stroke-dashoffset="0"/>
+          </svg>
+          <div class="gp-timer-num" id="hud-timer">30</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main layout -->
+    <div class="gp-main">
+      <!-- Center -->
+      <div class="gp-center" id="gp-center">
+        <!-- Phase content injected dynamically -->
+      </div>
+
+      <!-- Sidebar -->
+      <div class="gp-sidebar">
+        <div class="gp-sidebar-section">
+          <div class="gp-sidebar-title">Players</div>
+          <div class="gp-player-list" id="sidebar-players"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Game End Overlay ───────────────────────────────────── -->
+  <div id="overlay-game-end" class="gp-overlay hidden">
+    <div class="gp-overlay-card">
+      <div style="font-size:2.5rem;margin-bottom:0.5rem">📞</div>
+      <div class="gp-overlay-title">That was hilarious!</div>
+      <p style="color:var(--text-dim);margin-bottom:1rem">All chains have been revealed.</p>
+      <div style="display:flex;gap:0.75rem;justify-content:center">
+        <button id="btn-play-again" class="btn btn-primary">Play Again</button>
+        <a href="/" class="btn btn-secondary">Exit</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/sounds.js"></script>
+  <script src="/gartic.js"></script>
+</body>
+</html>

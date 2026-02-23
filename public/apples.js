@@ -1,4 +1,4 @@
-/* ── Trivia Client ──────────────────────────────────────────────────────── */
+/* ── Apples to Apples Client ────────────────────────────────────────────── */
 
 const socket = io({ transports: ['websocket'] });
 
@@ -7,9 +7,12 @@ let myId         = null;
 let myRoomId     = null;
 let myUsername   = '';
 let roomOwnerId  = null;
-let timerMax     = 10;
-let hasAnswered  = false;
-let currentPhase = 'lobby'; // lobby, question, reveal, game_end
+let timerMax     = 45;
+let currentPhase = 'lobby'; // lobby, picking, judging, reveal, game_end
+let myHand       = [];
+let isJudge      = false;
+let hasSubmitted  = false;
+let currentJudgeId = null;
 
 // ── Screens ────────────────────────────────────────────────────────────────
 const screens = {
@@ -41,7 +44,6 @@ const btnCreate    = document.getElementById('btn-create');
 const btnJoin      = document.getElementById('btn-join');
 const inpRoomCode  = document.getElementById('inp-room-code');
 const inpRounds    = document.getElementById('inp-rounds');
-const inpTime      = document.getElementById('inp-time');
 
 const waitingCode    = document.getElementById('waiting-room-code');
 const waitingCount   = document.getElementById('waiting-player-count');
@@ -57,7 +59,7 @@ const hudTotalRounds = document.getElementById('hud-total-rounds');
 const hudPhase       = document.getElementById('hud-phase');
 const hudTimer       = document.getElementById('hud-timer');
 const timerArc       = document.getElementById('timer-arc');
-const tvCenter       = document.getElementById('tv-center');
+const aaCenter       = document.getElementById('aa-center');
 const scoreList      = document.getElementById('score-list');
 
 const overlayGame    = document.getElementById('overlay-game-end');
@@ -96,17 +98,16 @@ inpUsername.addEventListener('keydown', e => {
 });
 
 btnCreate.addEventListener('click', () => {
-  socket.emit('tv:create', {
-    username:        myUsername,
-    totalRounds:     parseInt(inpRounds.value),
-    timePerQuestion: parseInt(inpTime.value),
+  socket.emit('aa:create', {
+    username:    myUsername,
+    totalRounds: parseInt(inpRounds.value),
   });
 });
 
 btnJoin.addEventListener('click', () => {
   const code = inpRoomCode.value.toUpperCase().trim();
   if (!code) { showLobbyError('Enter a room code'); return; }
-  socket.emit('tv:join', { username: myUsername, roomId: code });
+  socket.emit('aa:join', { username: myUsername, roomId: code });
 });
 
 inpRoomCode.addEventListener('keydown', e => {
@@ -134,8 +135,8 @@ function renderWaiting(room) {
   if (room.owner === myId) {
     btnStart.classList.remove('hidden');
     waitingNotOwner.classList.add('hidden');
-    btnStart.disabled = room.players.length < 2;
-    btnStart.textContent = room.players.length < 2 ? 'Need 2+ players' : 'Start Game';
+    btnStart.disabled = room.players.length < 3;
+    btnStart.textContent = room.players.length < 3 ? 'Need 3+ players' : 'Start Game';
   } else {
     btnStart.classList.add('hidden');
     waitingNotOwner.classList.remove('hidden');
@@ -150,7 +151,7 @@ btnCopyCode.addEventListener('click', () => {
 });
 
 btnCopyLink.addEventListener('click', () => {
-  const link = `${window.location.origin}/trivia/join/${waitingCode.textContent}`;
+  const link = `${window.location.origin}/apples/join/${waitingCode.textContent}`;
   navigator.clipboard.writeText(link).then(() => {
     linkCopiedMsg.classList.remove('hidden');
     setTimeout(() => linkCopiedMsg.classList.add('hidden'), 2000);
@@ -158,13 +159,13 @@ btnCopyLink.addEventListener('click', () => {
 });
 
 btnStart.addEventListener('click', () => {
-  socket.emit('tv:start', myRoomId);
+  socket.emit('aa:start', myRoomId);
 });
 
 // Leave room on back link
-document.querySelector('#screen-waiting .back-link').addEventListener('click', e => {
+document.getElementById('leave-link').addEventListener('click', e => {
   e.preventDefault();
-  socket.emit('tv:leave');
+  socket.emit('aa:leave');
   showScreen('lobby');
   resetLobby();
 });
@@ -177,7 +178,7 @@ function updateTimerArc(timeLeft, max) {
   const offset = CIRC * (1 - frac);
   timerArc.style.strokeDashoffset = offset;
 
-  if (frac > 0.5)       timerArc.style.stroke = '#8b5cf6';
+  if (frac > 0.5)       timerArc.style.stroke = '#16a34a';
   else if (frac > 0.25) timerArc.style.stroke = 'var(--yellow)';
   else                   timerArc.style.stroke = 'var(--accent)';
 
@@ -189,7 +190,10 @@ function renderScores(scores) {
   scoreList.innerHTML = '';
   scores.forEach((p, i) => {
     const div = document.createElement('div');
-    div.className = 'score-item' + (p.id === myId ? ' is-me' : '');
+    let cls = 'score-item';
+    if (p.id === myId) cls += ' is-me';
+    if (p.id === currentJudgeId) cls += ' is-judge';
+    div.className = cls;
     div.innerHTML = `
       <span class="score-rank">${i + 1}</span>
       <span class="score-name">${escHtml(p.name)}</span>
@@ -215,116 +219,138 @@ function renderOverlayScores(container, scores) {
   });
 }
 
-// ── Question UI ────────────────────────────────────────────────────────────
-function renderQuestionPhase(data) {
-  currentPhase = 'question';
-  hasAnswered = false;
-  hudPhase.textContent = 'Answer';
+// ── Picking Phase UI ──────────────────────────────────────────────────────
+function renderPickingPhase(data) {
+  currentPhase = 'picking';
+  hasSubmitted = false;
+  isJudge = data.isJudge;
+  myHand = data.hand || [];
+  currentJudgeId = data.judgeId;
+  hudPhase.textContent = 'Pick a Card';
   hudRound.textContent = data.round;
   hudTotalRounds.textContent = data.totalRounds;
   timerMax = data.timeLeft;
   updateTimerArc(data.timeLeft, timerMax);
 
-  const diffClass = data.difficulty === 'easy' ? 'tv-diff-easy' :
-                    data.difficulty === 'medium' ? 'tv-diff-medium' : 'tv-diff-hard';
+  // Update scoreboard from player list
+  renderScores(data.players);
 
-  const letters = ['A', 'B', 'C', 'D'];
+  if (isJudge) {
+    aaCenter.innerHTML = `
+      <div class="aa-judge-label">You are the Judge this round</div>
+      <div class="aa-card aa-card-green aa-green-prompt">${escHtml(data.greenCard)}</div>
+      <p class="aa-status-text">Waiting for other players to pick their cards…</p>
+      <div class="aa-status-text" id="submit-count"></div>
+    `;
+  } else {
+    aaCenter.innerHTML = `
+      <div class="aa-judge-label">Judge: ${escHtml(data.judgeName)}</div>
+      <div class="aa-card aa-card-green aa-green-prompt">${escHtml(data.greenCard)}</div>
+      <p class="aa-status-text">Pick a red card from your hand!</p>
+      <div class="aa-hand" id="hand-container"></div>
+      <div class="aa-status-text" id="submit-count"></div>
+    `;
 
-  tvCenter.innerHTML = `
-    <div>
-      <span class="tv-question-category">${escHtml(data.category)}</span>
-      <span class="tv-question-difficulty ${diffClass}">${escHtml(data.difficulty)}</span>
-    </div>
-    <div class="tv-question-text">${escHtml(data.question)}</div>
-    <div class="tv-answers-grid" id="answers-grid"></div>
-    <div class="tv-answer-status" id="answer-status"></div>
+    const handEl = document.getElementById('hand-container');
+    myHand.forEach((card, idx) => {
+      const cardEl = document.createElement('div');
+      cardEl.className = 'aa-hand-card';
+      cardEl.textContent = card;
+      cardEl.addEventListener('click', () => {
+        if (hasSubmitted) return;
+        hasSubmitted = true;
+        socket.emit('aa:submit', { cardIndex: idx });
+        // Highlight selected, disable others
+        handEl.querySelectorAll('.aa-hand-card').forEach((c, ci) => {
+          if (ci === idx) {
+            c.classList.add('selected');
+          } else {
+            c.classList.add('disabled');
+          }
+        });
+        const statusP = aaCenter.querySelector('.aa-status-text');
+        if (statusP) statusP.textContent = 'Card submitted! Waiting for others…';
+      });
+      handEl.appendChild(cardEl);
+    });
+  }
+}
+
+// ── Judging Phase UI ──────────────────────────────────────────────────────
+function renderJudgingPhase(data) {
+  currentPhase = 'judging';
+  currentJudgeId = data.judgeId;
+  hudPhase.textContent = 'Judge Picks';
+  timerMax = data.timeLeft;
+  updateTimerArc(data.timeLeft, timerMax);
+
+  const amJudge = data.judgeId === myId;
+
+  aaCenter.innerHTML = `
+    <div class="aa-judge-label">${amJudge ? 'You are the Judge — pick the best match!' : `Judge: ${escHtml(data.judgeName)} is picking…`}</div>
+    <div class="aa-card aa-card-green aa-green-prompt">${escHtml(data.greenCard)}</div>
+    <div class="aa-judge-cards" id="judge-cards"></div>
+    <p class="aa-status-text" id="judging-status">${amJudge ? 'Click the funniest card!' : 'Waiting for the judge to decide…'}</p>
   `;
 
-  const grid = document.getElementById('answers-grid');
-  data.answers.forEach((ans, idx) => {
-    const btn = document.createElement('button');
-    btn.className = 'tv-answer-btn';
-    btn.dataset.index = idx;
-    btn.innerHTML = `
-      <span class="tv-answer-letter">${letters[idx]}</span>
-      <span class="tv-answer-text">${escHtml(ans)}</span>
-    `;
-    btn.addEventListener('click', () => {
-      if (hasAnswered) return;
-      hasAnswered = true;
-      socket.emit('tv:answer', { answerIndex: idx });
-      // Disable all, highlight chosen
-      grid.querySelectorAll('.tv-answer-btn').forEach(b => {
-        b.disabled = true;
-        if (b === btn) b.classList.add('selected');
+  const cardsEl = document.getElementById('judge-cards');
+  data.cards.forEach((c) => {
+    const cardEl = document.createElement('div');
+    cardEl.className = 'aa-judge-card' + (amJudge ? ' clickable' : '');
+    cardEl.textContent = c.card;
+    if (amJudge) {
+      cardEl.addEventListener('click', () => {
+        socket.emit('aa:judge', { cardIndex: c.index });
+        // Disable further clicks
+        cardsEl.querySelectorAll('.aa-judge-card').forEach(el => {
+          el.classList.remove('clickable');
+        });
+        cardEl.classList.add('winner');
+        const status = document.getElementById('judging-status');
+        if (status) status.textContent = 'You picked! Revealing…';
       });
-      const status = document.getElementById('answer-status');
-      if (status) status.textContent = 'Answer locked in!';
-    });
-    grid.appendChild(btn);
+    }
+    cardsEl.appendChild(cardEl);
   });
 }
 
-// ── Reveal UI ──────────────────────────────────────────────────────────────
+// ── Reveal Phase UI ───────────────────────────────────────────────────────
 function renderReveal(data) {
   currentPhase = 'reveal';
   hudPhase.textContent = 'Reveal';
-  if (data.scores) renderScores(data.scores);
+  renderScores(data.scores);
 
-  // Update answer buttons to show correct/wrong
-  const grid = document.getElementById('answers-grid');
-  if (grid) {
-    grid.querySelectorAll('.tv-answer-btn').forEach(btn => {
-      const idx = parseInt(btn.dataset.index);
-      btn.classList.add('revealed');
-      btn.disabled = true;
-      if (idx === data.correctIndex) {
-        btn.classList.add('correct');
-      } else {
-        btn.classList.add('wrong');
-      }
-    });
+  aaCenter.innerHTML = `
+    <div class="aa-card aa-card-green aa-green-prompt">${escHtml(data.greenCard)}</div>
+    <div style="text-align:center">
+      <span style="font-size:1.1rem;font-weight:800;color:#facc15">🏆 ${escHtml(data.winnerName)} wins this round!</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:0.5rem;max-width:500px;width:100%" id="reveal-list"></div>
+  `;
+
+  const list = document.getElementById('reveal-list');
+  for (const sub of data.allSubmissions) {
+    const div = document.createElement('div');
+    div.className = 'aa-reveal-sub' + (sub.isWinner ? ' is-winner' : '');
+    div.innerHTML = `
+      <span class="aa-reveal-name">${escHtml(sub.playerName)}${sub.playerId === myId ? ' (you)' : ''}</span>
+      <span class="aa-reveal-card-text">${escHtml(sub.card)}</span>
+      ${sub.isWinner ? '<span class="aa-reveal-winner-badge">WINNER</span>' : ''}
+    `;
+    list.appendChild(div);
   }
 
-  // Show player results below answers
-  const status = document.getElementById('answer-status');
-  if (status) {
-    const myResult = data.playerResults.find(r => r.id === myId);
-    if (myResult) {
-      if (myResult.correct) {
-        status.innerHTML = `<span style="color:var(--green);font-weight:700">Correct! +${myResult.points} pts</span>`;
-        SFX.correct();
-      } else if (myResult.answerIndex === -1) {
-        status.innerHTML = `<span style="color:var(--text-dim)">No answer</span>`;
-      } else {
-        status.innerHTML = `<span style="color:#ef4444;font-weight:700">Wrong!</span>`;
-        SFX.lose();
-      }
-    }
+  // Sound
+  if (data.winnerId === myId) {
+    SFX.win();
+  } else {
+    SFX.turnStart();
   }
-
-  // Render player result chips
-  const existing = document.getElementById('reveal-results');
-  if (existing) existing.remove();
-
-  const resultsDiv = document.createElement('div');
-  resultsDiv.id = 'reveal-results';
-  resultsDiv.className = 'tv-reveal-results';
-  resultsDiv.style.marginTop = '0.75rem';
-
-  for (const r of data.playerResults) {
-    const chip = document.createElement('span');
-    chip.className = `tv-reveal-player ${r.correct ? 'correct' : 'wrong'}`;
-    chip.textContent = r.correct ? `${r.name} +${r.points}` : `${r.name} ✗`;
-    resultsDiv.appendChild(chip);
-  }
-
-  tvCenter.appendChild(resultsDiv);
 }
 
 // ── Play Again ──────────────────────────────────────────────────────────────
 btnPlayAgain.addEventListener('click', () => {
-  socket.emit('tv:reset', myRoomId);
+  socket.emit('aa:reset', myRoomId);
 });
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -350,7 +376,7 @@ socket.on('connect', () => {
   myId = socket.id;
 });
 
-socket.on('tv:joined', ({ roomId, playerId, room }) => {
+socket.on('aa:joined', ({ roomId, playerId, room }) => {
   myId        = playerId;
   myRoomId    = roomId;
   roomOwnerId = room.owner;
@@ -358,52 +384,60 @@ socket.on('tv:joined', ({ roomId, playerId, room }) => {
   showScreen('waiting');
 });
 
-socket.on('tv:playerJoined', ({ room }) => {
+socket.on('aa:playerJoined', ({ room }) => {
   renderWaiting(room);
   SFX.join();
 });
 
-socket.on('tv:playerLeft', ({ room }) => {
+socket.on('aa:playerLeft', ({ room }) => {
   roomOwnerId = room.owner;
-  renderWaiting(room);
+  if (room.state === 'lobby') {
+    renderWaiting(room);
+  }
   SFX.leave();
 });
 
-socket.on('tv:started', ({ room }) => {
+socket.on('aa:started', ({ room }) => {
   SFX.gameStart();
   hudTotalRounds.textContent = room.totalRounds;
   showScreen('game');
   overlayGame.classList.add('hidden');
 });
 
-socket.on('tv:tick', ({ timeLeft }) => {
+socket.on('aa:tick', ({ timeLeft }) => {
   updateTimerArc(timeLeft, timerMax);
   if (timeLeft <= 5 && timeLeft > 0) SFX.tick();
 });
 
-socket.on('tv:questionStart', (data) => {
+socket.on('aa:roundStart', (data) => {
   SFX.turnStart();
-  renderQuestionPhase(data);
+  renderPickingPhase(data);
 });
 
-socket.on('tv:playerAnswered', ({ answerCount, totalPlayers }) => {
-  const status = document.getElementById('answer-status');
-  if (status && !hasAnswered) {
-    status.textContent = `${answerCount} / ${totalPlayers} answered`;
-  }
+socket.on('aa:submitted', ({ card }) => {
+  // Confirmation that our card was accepted - already handled in click handler
 });
 
-socket.on('tv:reveal', (data) => {
+socket.on('aa:submitCount', ({ count, total }) => {
+  const el = document.getElementById('submit-count');
+  if (el) el.textContent = `${count} / ${total} cards submitted`;
+});
+
+socket.on('aa:judgingStart', (data) => {
+  renderJudgingPhase(data);
+});
+
+socket.on('aa:reveal', (data) => {
   renderReveal(data);
 });
 
-socket.on('tv:gameOver', ({ scores, winner }) => {
+socket.on('aa:gameOver', ({ scores, winner }) => {
   currentPhase = 'game_end';
 
   if (winner) {
     const isMe = winner.id === myId;
     if (isMe) SFX.win(); else SFX.lose();
-    gameWinner.textContent = isMe ? '🎉 You won!' : `🏆 ${winner.name} wins!`;
+    gameWinner.textContent = isMe ? '🎉 You won!' : `🍎 ${winner.name} wins!`;
   } else {
     gameWinner.textContent = 'Game Over!';
   }
@@ -416,7 +450,7 @@ socket.on('tv:gameOver', ({ scores, winner }) => {
   gameCountdown.textContent  = amOwner ? '' : 'Waiting for host to start a new game…';
 });
 
-socket.on('tv:reset', ({ room }) => {
+socket.on('aa:reset', ({ room }) => {
   overlayGame.classList.add('hidden');
   myRoomId    = room.id;
   roomOwnerId = room.owner;
@@ -424,11 +458,11 @@ socket.on('tv:reset', ({ room }) => {
   showScreen('waiting');
 });
 
-socket.on('tv:error', ({ message }) => {
+socket.on('aa:error', ({ message }) => {
   showLobbyError(message);
 });
 
-// ── Invite Link / Direct Join ─────────────────────────────────────────────────
+// ── Invite Link / Direct Join ─────────────────────────────────────────────
 const lobbyDirectJoin    = document.getElementById('lobby-direct-join');
 const inpUsernameDirect  = document.getElementById('inp-username-direct');
 const btnDirectJoin      = document.getElementById('btn-direct-join');
@@ -436,7 +470,7 @@ const btnBackToLobby     = document.getElementById('btn-back-to-lobby');
 let _inviteCode = null;
 
 function checkInviteUrl() {
-  const match = window.location.pathname.match(/^\/trivia\/join\/([A-Z0-9]{6})$/i);
+  const match = window.location.pathname.match(/^\/apples\/join\/([A-Z0-9]{6})$/i);
   if (!match) return;
   _inviteCode = match[1].toUpperCase();
 
@@ -445,14 +479,14 @@ function checkInviteUrl() {
   lobbyDirectJoin.classList.remove('hidden');
   inpUsernameDirect.focus();
 
-  history.replaceState(null, '', '/trivia');
+  history.replaceState(null, '', '/apples');
 }
 
 btnDirectJoin.addEventListener('click', () => {
   const name = inpUsernameDirect.value.trim();
   if (!name) { showLobbyError('Enter your name first'); return; }
   myUsername = name;
-  socket.emit('tv:join', { username: myUsername, roomId: _inviteCode });
+  socket.emit('aa:join', { username: myUsername, roomId: _inviteCode });
   _inviteCode = null;
   lobbyDirectJoin.classList.add('hidden');
 });
